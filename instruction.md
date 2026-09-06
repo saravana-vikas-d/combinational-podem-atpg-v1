@@ -26,6 +26,43 @@ Local machine  ──push/pull──►  github  ──►  GitHub (public backu
 
 Your `main` branch is set to track **`github/main`**, so a plain `git push` goes to **GitHub** by default. That's the right setup for daily work.
 
+### Your Accounts
+
+| Service | Email |
+|---|---|
+| **Cursor** | `saravanavikas12@gmail.com` |
+| **GitHub** | `saravanavikasd@gmail.com` |
+
+Use your **GitHub email** for git commits so they appear on your GitHub profile.
+
+---
+
+## One-Time Setup: Git Identity
+
+Git needs your name and email before you can commit. If you see `Author identity unknown`, set it once.
+
+**For this repo only** (already configured):
+
+```bash
+cd /home/saravana/combinational-podem-atpg-v1
+git config user.name "Saravana Vikas"
+git config user.email "saravanavikasd@gmail.com"
+```
+
+**For all repos on this machine** (optional):
+
+```bash
+git config --global user.name "Saravana Vikas"
+git config --global user.email "saravanavikasd@gmail.com"
+```
+
+Verify:
+
+```bash
+git config user.name
+git config user.email
+```
+
 ---
 
 ## Daily Workflow (Follow Every Coding Session)
@@ -126,6 +163,7 @@ git push origin main
 
 | Problem | Fix |
 |---|---|
+| `Author identity unknown` on commit | Set `user.name` and `user.email` (see One-Time Setup above) |
 | `git push` rejected (remote has new commits) | `git pull` → resolve conflicts → `git push` |
 | Pushed to wrong remote | Use `git push github main` explicitly |
 | Want to see remotes | `git remote -v` |
