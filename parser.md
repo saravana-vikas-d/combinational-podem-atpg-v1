@@ -337,6 +337,365 @@ Recommended parse tests in increasing complexity:
 
 ---
 
+## Implementation plan (step-by-step)
+
+Forward build order for the parser module. Each step is independently testable before moving on — you never need the full parser working to validate the piece you just built.
+
+### Build order summary
+
+```
+Step 0  Scaffold + pytest
+Step 1  Data model                    ← test with manual objects
+Step 2  Preprocessing utils            ← test with file snippets
+Step 3  Declaration parser            ← test with real decl sections
+Step 4  Gate line parser               ← test one line at a time
+Step 5  Circuit builder                ← test tiny in-memory netlists
+Step 6  Validation                     ← test valid + mutated circuits
+Step 7  Levelization                   ← test c17 depth, cycle detection
+Step 8  Full ISCAS parser              ← test c17 → full suite
+Step 9  Pluggable interface           ← test protocol + stub
+Step 10 Regression / performance      ← all 11 benchmarks
+```
+
+---
+
+### Step 0 — Project scaffold
+
+**Goal:** Minimal project skeleton so tests can run from day one.
+
+**Deliverables:**
+
+- `src/circuit/`, `src/parser/`, `tests/`
+- `pyproject.toml` or `requirements.txt` with `pytest`
+- Empty `__init__.py` files
+
+**Testing:**
+
+```bash
+pytest --collect-only   # confirms test discovery works
+```
+
+---
+
+### Step 1 — Core data model
+
+**Goal:** Define the objects the parser will populate.
+
+**Deliverables:** `src/circuit/circuit.py`
+
+- `GateType` enum (`AND`, `OR`, `NAND`, `NOR`, `NOT`, `BUF`, `XOR`, `XNOR`)
+- `FanoutEdge(gate, input_index)`
+- `Signal(name, is_pi, is_po, driver, fanouts, level)`
+- `Gate(id, instance_name, type, inputs, output, level)`
+- `Circuit(name, signals, gates, primary_inputs, primary_outputs, levels)`
+
+**Testing:** `tests/circuit/test_circuit.py`
+
+| Test | Method |
+|------|--------|
+| Construct objects manually | Build a 2-gate mini-circuit in code; assert field values |
+| PI/PO flags | `Signal("N1", is_pi=True)` vs wire signal |
+| Fanout wiring | Add `FanoutEdge` to a signal; assert `len(signal.fanouts) == 1` |
+| Ordered ports | `Circuit.primary_inputs` preserves insertion order (needed for test patterns later) |
+
+No Verilog yet — pure Python dataclass tests.
+
+---
+
+### Step 2 — Verilog preprocessing utilities
+
+**Goal:** Normalize raw `.v` text before parsing.
+
+**Deliverables:** `src/parser/verilog_utils.py`
+
+- Strip `//` comment lines
+- Join multi-line statements until `;` (for `module`, `input`, `output`, `wire`)
+- Split comma-separated identifier lists (handle newlines, tabs, extra spaces)
+
+**Testing:** `tests/parser/test_verilog_utils.py`
+
+| Test | Input | Assert |
+|------|-------|--------|
+| Comment removal | `// Ninputs 5\ninput N1;` | Yields `input N1;` only |
+| Multi-line input | 3-line `input` ending in `;` | Single joined string |
+| Tab handling | c1355-style tab-indented decl | Same identifiers as space version |
+| Identifier split | `"N1,N2,\n N3"` | `["N1", "N2", "N3"]` |
+| Underscore IDs | `"N241_I,N241_O"` | Preserved exactly |
+
+Use **snippets** copied from real files (`c17.v`, `c1355.v`), not full circuits.
+
+---
+
+### Step 3 — Declaration parser
+
+**Goal:** Extract module name, ports, PIs, POs, and wires.
+
+**Deliverables:** `src/parser/decl_parser.py`
+
+- `parse_module_header(stmt) → (name, ports)`
+- `parse_input/output/wire(stmt) → list[str]`
+- `parse_declarations(lines) → Declarations(module, ports, inputs, outputs, wires)`
+
+**Testing:** `tests/parser/test_decl_parser.py`
+
+| Test | Source | Assert |
+|------|--------|--------|
+| c17 declarations | Real `c17.v` | 5 inputs, 2 outputs, 4 wires |
+| c432 multi-line | Real header section | PI=36, PO=7, wire count=153 |
+| c1355 no header | Real `c1355.v` | Still parses; PI=41, PO=32 |
+| Port order preserved | `c17.v` module port list | First PI is `N1`, PO order `[N22, N23]` |
+| Unknown statement | `"assign x = y;"` | Ignored or flagged (document the choice) |
+
+**Manual check:**
+
+```python
+decls = parse_declarations(c17_lines)
+print(len(decls.inputs), len(decls.outputs), len(decls.wires))
+# expect: 5, 2, 4
+```
+
+---
+
+### Step 4 — Gate line parser
+
+**Goal:** Parse a single gate instance line into structured data.
+
+**Deliverables:** `src/parser/gate_parser.py`
+
+- `parse_gate_line(line) → GateLine(type, instance, output, inputs)`
+- Handle spaced and compact syntax (`nand G (a, b, c)` and `nand G(a,b,c)`)
+
+**Testing:** `tests/parser/test_gate_parser.py`
+
+| Test | Line | Assert |
+|------|------|--------|
+| 2-input NAND | `nand NAND2_1 (N10, N1, N3);` | type=NAND, fanin=2, out=N10 |
+| NOT gate | `not NOT1_1 (N190, N1);` | fanin=1 |
+| Compact AND5 | `and AND5_0(N996,N925,N950,N912,N951,N986);` | fanin=5 |
+| 9-input AND | c432 `AND9_46` line | fanin=9 |
+| XOR | c499 line | type=XOR |
+| Invalid keyword | `foo BAR (a, b);` | raises `ParseError` |
+| Missing semicolon | malformed line | raises `ParseError` |
+
+Test **one line at a time** — no file I/O needed.
+
+---
+
+### Step 5 — Circuit builder (connectivity)
+
+**Goal:** Turn declarations + gate lines into a wired `Circuit`.
+
+**Deliverables:** `src/parser/circuit_builder.py`
+
+- Create `Signal` for every PI, PO, wire
+- PI signals: `driver=None`
+- For each gate: create `Gate`, set output signal's `driver`, append `FanoutEdge` on each input
+- PIs used in gates must already exist from `input` declarations (c17: `N6`, `N7`)
+
+**Testing:** `tests/parser/test_circuit_builder.py`
+
+Build from **hand-crafted** decls + gate lines first (tiny 3-gate netlist in test code), then:
+
+| Test | Assert |
+|------|--------|
+| Fanout count | Signal feeding 2 gates has `len(fanouts) == 2` |
+| Driver set | Internal wire's `driver` is the driving gate |
+| PI driver | All PIs have `driver is None` |
+| Gate inputs | `gate.inputs[0]` is correct `Signal` object (identity, not just name) |
+| Gate types | Mixed AND/NAND/NOT counts match input lines |
+
+**Mini-netlist test (in-memory):**
+
+```verilog
+input A, B;
+output Y;
+wire w;
+nand g1(w, A, B);
+not g2(Y, w);
+```
+
+→ 2 PIs, 1 wire, 1 PO, 2 gates, `w.fanouts[0].gate == g1`
+
+---
+
+### Step 6 — Validation layer
+
+**Goal:** Catch illegal netlists before levelization.
+
+**Deliverables:** `src/circuit/validate.py`
+
+- `validate(circuit) → None` or raise typed errors
+
+**Checks:**
+
+1. Every gate input/output signal exists
+2. Exactly one driver per non-PI signal
+3. No PI driven by a gate
+4. Every PO is driven (has a driver)
+5. No undriven internal wires
+6. (Optional) Header comment cross-check when present
+
+**Testing:** `tests/circuit/test_validate.py`
+
+| Test | How |
+|------|-----|
+| Valid c17 model | Parse/build c17 → `validate()` passes |
+| Multi-driver | Manually attach 2 drivers to one wire → `MultiDriverError` |
+| PI driven | Set `pi.driver = some_gate` → error |
+| Undriven wire | Leave wire without driver → error |
+| Unknown signal | Reference `"GHOST"` in gate → error |
+
+Use **programmatic circuit mutation** for negative tests — don't need bad Verilog files.
+
+---
+
+### Step 7 — Levelization
+
+**Goal:** Assign topological levels for forward implication.
+
+**Deliverables:** `src/circuit/levelize.py`
+
+- Kahn's algorithm from PIs (level 0)
+- `circuit.levels: list[list[Gate]]` — gates grouped by level
+- Set `signal.level` and `gate.level`
+
+**Testing:** `tests/circuit/test_levelize.py`
+
+| Test | Circuit | Assert |
+|------|---------|--------|
+| c17 depth | Real c17 | Max level = 3 |
+| PI level | Any | All PIs have `level == 0` |
+| Level monotonicity | Any | Every gate input level < gate level |
+| Partition complete | c17 | Sum of gates in levels == total gates |
+| Cycle detection | Inject back-edge in mini circuit | `CycleError` raised |
+| c6288 stress | Full parse | Max depth ≈ 124, no crash |
+
+**Structural sanity:**
+
+```python
+for level_gates in circuit.levels:
+    for g in level_gates:
+        assert all(s.level < g.level for s in g.inputs)
+```
+
+---
+
+### Step 8 — Full ISCAS parser (integration)
+
+**Goal:** End-to-end `parse_iscas_verilog(path) → Circuit`.
+
+**Deliverables:** `src/parser/iscas_verilog.py`
+
+- `IscasVerilogParser.parse(path) → Circuit`
+- Orchestrates: read file → preprocess → declarations → gate lines → build → validate → levelize
+
+**Testing:** `tests/parser/test_iscas_verilog.py`
+
+#### Smoke tests (parametrize over benchmarks)
+
+| Circuit | Key assertions |
+|---------|----------------|
+| **c17** | 5 PI, 2 PO, 6 gates, all NAND, levelized |
+| **c1355** | 546 gates, compact syntax, no header |
+| **c432** | 160 gates, XOR present, max fanin 9 |
+| **c499** | XOR gates, 202 gates |
+| **c7552** | 3513 gates, `N241_I`/`N241_O` parse correctly |
+
+```python
+@pytest.mark.parametrize("circuit,pi,po,gates", [
+    ("c17.v", 5, 2, 6),
+    ("c432.v", 36, 7, 160),
+    # ...
+])
+def test_parse_counts(circuit, pi, po, gates):
+    c = parse(f"ISCAS85_Circuits/{circuit}")
+    assert len(c.primary_inputs) == pi
+    assert len(c.primary_outputs) == po
+    assert len(c.gates) == gates
+```
+
+#### Structural tests (all 11 circuits)
+
+```bash
+pytest tests/parser/test_iscas_verilog.py -k structural
+```
+
+Each must pass:
+
+- `validate(circuit)` — no errors
+- `len(circuit.levels) > 0`
+- Header comment cross-check (when present): `// NtotalGates` matches
+
+#### Gate-type inventory test (c880, c6288)
+
+Compare parsed `GateType` counts against header comments:
+
+```
+// NAND2 60  →  count(type=NAND, fanin=2) == 60
+```
+
+---
+
+### Step 9 — Pluggable parser interface
+
+**Goal:** Abstract interface for future Yosys parser.
+
+**Deliverables:** `src/parser/base.py`, stub `src/parser/yosys_verilog.py`
+
+```python
+class NetlistParser(Protocol):
+    def parse(self, path: str) -> Circuit: ...
+```
+
+**Testing:** `tests/parser/test_parser_plugin.py`
+
+| Test | Assert |
+|------|--------|
+| ISCAS implements protocol | `isinstance(IscasVerilogParser(), NetlistParser)` |
+| Yosys stub | `YosysVerilogParser().parse(...)` raises `NotImplementedError` with clear message |
+| Dispatch | Registry `get_parser("iscas")` returns working parser |
+
+---
+
+### Step 10 — Regression / performance gate
+
+**Goal:** Confirm parser handles worst-case benchmarks within reasonable time.
+
+**Testing:** `tests/parser/test_parser_regression.py`
+
+| Test | Method |
+|------|--------|
+| Full suite | Parse all 11 files in one test; all pass validate + levelize |
+| Performance | `c7552.v` parses in < 2 seconds (adjust threshold as needed) |
+| Memory | No explosion on 3,513 gates (sanity, not strict profiling) |
+| Idempotent | Parse same file twice → identical gate count and signal names |
+
+```bash
+pytest tests/parser/ -v
+time python -c "from src.parser.iscas_verilog import parse; parse('ISCAS85_Circuits/c7552.v')"
+```
+
+---
+
+### Definition of done (Module 1)
+
+From `plan.md`, the parser module is **done** when:
+
+- [ ] All deliverables in Steps 0–9 exist
+- [ ] `pytest tests/parser/ tests/circuit/` passes
+- [ ] **c17 checkpoint:** 5 PIs, 2 POs, 6 NAND gates, levelized
+- [ ] All 11 ISCAS85 circuits parse without error
+- [ ] `plan.md` status updated: `parser-circuit` → `done`
+
+### Practical tips while building
+
+1. **Never skip Step 5's mini-netlist tests** — they catch fanout/driver bugs faster than full benchmarks.
+2. **Parametrize benchmark tests** — one test function, 11 circuits, easy to extend.
+3. **Keep golden values in one place** — a `BENCHMARK_EXPECTATIONS` dict at the top of the test file, sourced from the benchmark table in this document.
+4. **Commit after each step** — e.g. `add circuit data model and unit tests`, `add gate line parser with compact syntax support`.
+
+---
+
 ## References
 
 - Project plan: `plan.md` (Module 1 — Parser and circuit model)
