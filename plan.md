@@ -4,20 +4,24 @@
 
 ## Build progress
 
-| Module | ID | Status | Notes |
-|--------|----|--------|-------|
-| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit` | pending | |
-| Pluggable parser interface; Yosys stub | `parser-plugin` | pending | |
-| Five-valued forward implication and backtrace | `sim-logic5` | pending | |
-| Raw SA faults + equivalence/dominance collapsing | `fault-collapse` | pending | |
-| PODEM loop, D-frontier, per-fault patterns | `podem-core` | pending | |
-| CLI orchestration and output files | `cli-outputs` | pending | |
-| End-to-end validation on ISCAS'85 suite | `validate-benchmarks` | pending | |
-| Fault simulator + pattern compaction (Phase 2) | `compaction-optional` | pending | |
+
+| Module                                            | ID                    | Status  | Notes |
+| ------------------------------------------------- | --------------------- | ------- | ----- |
+| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | pending |       |
+| Pluggable parser interface; Yosys stub            | `parser-plugin`       | pending |       |
+| Five-valued forward implication and backtrace     | `sim-logic5`          | pending |       |
+| Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | pending |       |
+| PODEM loop, D-frontier, per-fault patterns        | `podem-core`          | pending |       |
+| CLI orchestration and output files                | `cli-outputs`         | pending |       |
+| End-to-end validation on ISCAS'85 suite           | `validate-benchmarks` | pending |       |
+| Fault simulator + pattern compaction (Phase 2)    | `compaction-optional` | pending |       |
+
 
 **Legend:** `pending` → `in_progress` → `done`
 
 ---
+
+
 
 ## Overview
 
@@ -31,6 +35,8 @@ Build a Python ATPG tool for all ISCAS'85 combinational benchmarks using single 
 Yosys-mapped netlist support is a later, pluggable parser extension.
 
 ---
+
+
 
 ## Input format: ISCAS-style Verilog (`.v`)
 
@@ -51,6 +57,8 @@ module c17(N1, N2, N3, N6, N22, N23);
 endmodule
 ```
 
+
+
 ### Parser strategy (pluggable)
 
 ```mermaid
@@ -67,12 +75,16 @@ flowchart LR
   YosysParser --> Circuit
 ```
 
+
+
+
 | Parser  | v1 scope           | Notes                                                                           |
 | ------- | ------------------ | ------------------------------------------------------------------------------- |
 | `iscas` | **Implement now**  | Primitive gate instances; ports = PI/PO; wires = internal signals               |
 | `yosys` | **Stub / phase 2** | Normalizes `$_AND_`, `$_OR_`, etc. or mapped cell names to same `GateType` enum |
 
-Both parsers must produce the **same internal `Circuit` object** so ATPG, collapsing, and PODEM are parser-agnostic.
+
+Both parsers must produce the **same internal** `Circuit` **object** so ATPG, collapsing, and PODEM are parser-agnostic.
 
 ### ISCAS'85 Verilog parsing steps
 
@@ -84,6 +96,8 @@ Both parsers must produce the **same internal `Circuit` object** so ATPG, collap
 6. Levelize gates from PIs (Kahn's algorithm)
 7. Reject unsupported constructs in v1: `assign`, behavioral code, multi-driver nets, sequential elements
 
+
+
 ### Benchmark sources
 
 Ship or download ISCAS'85 `.v` files (`c17`, `c432`, `c499`, `c880`, `c1355`, `c1908`, `c2670`, `c3540`, `c5315`, `c6288`, `c7552`). Use primitive-gate variants (e.g. `c880a.v` not cell-mapped `c880.v`).
@@ -92,15 +106,21 @@ Benchmarks live in `benchmarks/`.
 
 ---
 
+
+
 ## Signal-centric circuit model (DECIDED)
 
+
+
 ### Why signal-centric (not dual gate+wire graph nodes)
+
 
 | Approach                        | Pros                                                                              | Cons                                                                               |
 | ------------------------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
 | Gate + wire both as graph nodes | Visually matches schematic                                                        | PODEM implication/backtrace needs extra graph hops; fault sites ambiguous on edges |
 | **Signal-centric (chosen)**     | Natural fit for five-valued sim; faults map 1:1 to wire names; fanout is explicit | Must keep gate objects for evaluation                                              |
 | Gate-only adjacency list        | Compact                                                                           | Loses named fault sites; hard to align with Verilog wire names                     |
+
 
 **Decision:** Use a **signal-primary model** where `Signal` is the central entity and `Gate` objects connect signals. This matches Verilog semantics, the `signal_name_sa0/sa1` fault naming convention, and PODEM's need to read/write values on circuit lines.
 
@@ -143,6 +163,10 @@ classDiagram
   Gate --> Signal
 ```
 
+
+
+
+
 #### `Signal`
 
 - **name**: Verilog identifier (e.g. `N1`, `n10`) — also the **fault site name**
@@ -151,6 +175,8 @@ classDiagram
 - **fanouts**: list of `FanoutEdge(gate, input_index)` — every gate input this signal feeds
 - **value**: current five-valued logic during PODEM search (`0`, `1`, `X`, `D`, `D'`)
 - **level**: topological level (PIs = 0; others = driver gate level or max fanin level + 1)
+
+
 
 #### `Gate`
 
@@ -161,13 +187,18 @@ classDiagram
 - **output**: single `Signal` reference
 - **level**: assigned after levelization; gates processed in ascending level during forward implication
 
+
+
 #### `Circuit`
 
 - Container with `signals: dict[str, Signal]`, `gates: list[Gate]`
 - Ordered `primary_inputs` and `primary_outputs` (port order from Verilog module — defines test pattern bit order)
 - `levels: list[list[Gate]]` for levelized forward implication
 
+
+
 ### How operations map to this model
+
 
 | Operation           | Walk                                                                                         |
 | ------------------- | -------------------------------------------------------------------------------------------- |
@@ -175,6 +206,9 @@ classDiagram
 | Backtrace (PODEM)   | Start at a gate output signal; pick controlling values on input signals based on `Gate.type` |
 | Fault injection     | Set `signal.value` on the fault site; PODEM propagates D/D' from there                       |
 | Fault enumeration   | One SA0 + one SA1 per eligible `Signal` name                                                 |
+
+
+
 
 ### Fanout and fault sites
 
@@ -185,6 +219,8 @@ When a **single wire fans out to multiple gates** (fanout > 1):
 - **v1 decision:** Treat the wire as **one fault site** (`wire_name_sa0`, `wire_name_sa1`). This is the standard line/stuck-at model used in most ATPG tools on gate-level Verilog.
 - **Optional later:** Expand into branch signals (`wire_name__g10_in0`, `wire_name__g11_in1`) if branch-fault accuracy is required.
 
+
+
 ### What we explicitly do NOT model as separate nodes
 
 - Gate input **pins** — faults are on the **signal** feeding the pin, not a separate pin object
@@ -193,12 +229,16 @@ When a **single wire fans out to multiple gates** (fanout > 1):
 
 ---
 
+
+
 ## Fault naming convention (DECIDED)
+
 
 | Form                | Example   | Meaning                       |
 | ------------------- | --------- | ----------------------------- |
 | `{signal_name}_sa0` | `n10_sa0` | Wire `n10` stuck-at-0         |
 | `{signal_name}_sa1` | `N1_sa1`  | Primary input `N1` stuck-at-1 |
+
 
 Rules:
 
@@ -210,6 +250,8 @@ Rules:
 Internal `Fault` type: `Fault(signal_name: str, stuck_at: Literal[0, 1])` with string serialization `f"{signal_name}_sa{stuck_at}"`.
 
 ---
+
+
 
 ## High-level architecture
 
@@ -244,24 +286,32 @@ flowchart LR
   PODEM --> Report
 ```
 
+
+
+
+
 ### Package layout
 
-| Path | Purpose |
-|------|---------|
-| `src/parser/base.py` | `NetlistParser` protocol / abstract base |
-| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1) |
-| `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2) |
-| `src/circuit/circuit.py` | `Circuit`, `Gate`, `Signal`, `FanoutEdge` |
-| `src/circuit/levelize.py` | Topological level assignment |
-| `src/fault/fault.py` | `Fault` with `signal_name_sa0/sa1` naming |
-| `src/fault/collapsing.py` | Equivalence + dominance collapsing |
-| `src/sim/logic5.py` | Five-valued algebra (0, 1, X, D, D') |
-| `src/sim/implication.py` | Forward implication + backtrace |
-| `src/atpg/podem.py` | PODEM main loop |
-| `src/atpg/fault_sim.py` | Parallel fault simulation (compaction + validation) |
-| `src/cli/main.py` | Orchestration + file I/O |
+
+| Path                          | Purpose                                             |
+| ----------------------------- | --------------------------------------------------- |
+| `src/parser/base.py`          | `NetlistParser` protocol / abstract base            |
+| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              |
+| `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2)                         |
+| `src/circuit/circuit.py`      | `Circuit`, `Gate`, `Signal`, `FanoutEdge`           |
+| `src/circuit/levelize.py`     | Topological level assignment                        |
+| `src/fault/fault.py`          | `Fault` with `signal_name_sa0/sa1` naming           |
+| `src/fault/collapsing.py`     | Equivalence + dominance collapsing                  |
+| `src/sim/logic5.py`           | Five-valued algebra (0, 1, X, D, D')                |
+| `src/sim/implication.py`      | Forward implication + backtrace                     |
+| `src/atpg/podem.py`           | PODEM main loop                                     |
+| `src/atpg/fault_sim.py`       | Parallel fault simulation (compaction + validation) |
+| `src/cli/main.py`             | Orchestration + file I/O                            |
+
 
 ---
+
+
 
 ## Module 1 — Parser and circuit model
 
@@ -275,6 +325,8 @@ flowchart LR
 - [ ] Validation: single driver per net, acyclic, no unsupported constructs
 - [ ] Unit test: `benchmarks/c17.v` populates model with correct PI/PO/gate counts
 
+
+
 ### Validation checkpoint
 
 ```
@@ -282,6 +334,8 @@ c17: 5 PIs, 2 POs, 6 NAND gates, levelized
 ```
 
 ---
+
+
 
 ## Module 2 — Fault list and collapsing
 
@@ -300,14 +354,16 @@ PO signals are included (fault on output net before the port).
 
 Rules operate on the **gate driving or fed by a signal**, using signal names in equivalence classes:
 
+
 | Gate     | Equivalence examples                                          |
 | -------- | ------------------------------------------------------------- |
 | AND      | All input signals SA0 ≡ output signal SA0                     |
-| OR       | All input signals SA1 ≡ output signal SA1                   |
+| OR       | All input signals SA1 ≡ output signal SA1                     |
 | NAND     | All input signals SA0 ≡ output signal SA1                     |
 | NOR      | All input signals SA1 ≡ output signal SA0                     |
 | NOT/BUF  | Input signal SAx ≡ output signal SAx (inverted value for NOT) |
-| XOR/XNOR | **No input↔output equivalence**                             |
+| XOR/XNOR | **No input↔output equivalence**                               |
+
 
 Build equivalence classes; keep one representative per class (prefer output signal fault when tied).
 
@@ -328,19 +384,25 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 
 ---
 
+
+
 ## Module 3 — Five-valued simulation
 
 **Status:** pending
 
 ### Logic5 values
 
-| Value | Meaning |
-|-------|---------|
-| `0` | Logic zero (good and faulty agree) |
-| `1` | Logic one (good and faulty agree) |
-| `X` | Unknown |
-| `D` | Good=1, faulty=0 |
-| `D'` | Good=0, faulty=1 |
+
+| Value | Meaning                            |
+| ----- | ---------------------------------- |
+| `0`   | Logic zero (good and faulty agree) |
+| `1`   | Logic one (good and faulty agree)  |
+| `X`   | Unknown                            |
+| `D`   | Good=1, faulty=0                   |
+| `D'`  | Good=0, faulty=1                   |
+
+
+
 
 ### Deliverables
 
@@ -350,6 +412,8 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 - [ ] Per-gate unit tests (especially XOR/XNOR controlling tables)
 
 ---
+
+
 
 ## Module 4 — PODEM test pattern generation
 
@@ -361,6 +425,8 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 2. Forward implication: walk `Circuit.levels`, evaluate gates
 3. Backtrace: from gate output signal to input signals
 4. Fault injection: for `n10_sa0`, force `signals["n10"].value = 0` in faulty machine
+
+
 
 ### PODEM loop (per fault)
 
@@ -378,12 +444,20 @@ flowchart TD
   Assign --> PropPO
 ```
 
+
+
+
+
 ### Untestable vs aborted
+
 
 | Outcome                         | Meaning                    |
 | ------------------------------- | -------------------------- |
 | PODEM complete search → failure | **Untestable** (redundant) |
 | Backtrack/timeout limit hit     | **Aborted** (inconclusive) |
+
+
+
 
 ### Deliverables
 
@@ -394,6 +468,8 @@ flowchart TD
 - [ ] Batch run over collapsed fault list
 
 ---
+
+
 
 ## Module 5 — CLI and outputs
 
@@ -416,7 +492,10 @@ Future:
 python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 ```
 
+
+
 ### Output files
+
 
 | File                    | Contents                                                                 |
 | ----------------------- | ------------------------------------------------------------------------ |
@@ -424,6 +503,9 @@ python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 | `collapsed_faults.txt`  | Representative `signal_sa0/sa1` + collapsed members                      |
 | `untestable_faults.txt` | `signal_sa0/sa1` + reason (`redundant` / `aborted`)                      |
 | `summary.json`          | Circuit, parser used, raw/collapsed fault counts, pattern count, runtime |
+
+
+
 
 ### Deliverables
 
@@ -433,25 +515,31 @@ python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 
 ---
 
+
+
 ## Module 6 — Full benchmark validation
 
 **Status:** pending
 
 ### ISCAS'85 combinational suite
 
-| Circuit | Gates (approx) | Notes |
-|---------|----------------|-------|
-| c17     | 6              | Smoke test |
-| c432    | 160            | |
-| c499    | 202            | XOR-heavy — test early |
-| c880    | 383            | Use `c880a.v` |
-| c1355   | 546            | |
-| c1908   | 880            | |
-| c2670   | 1269           | |
-| c3540   | 1669           | |
-| c5315   | 2318           | |
+
+| Circuit | Gates (approx) | Notes                               |
+| ------- | -------------- | ----------------------------------- |
+| c17     | 6              | Smoke test                          |
+| c432    | 160            |                                     |
+| c499    | 202            | XOR-heavy — test early              |
+| c880    | 383            | Use `c880a.v`                       |
+| c1355   | 546            |                                     |
+| c1908   | 880            |                                     |
+| c2670   | 1269           |                                     |
+| c3540   | 1669           |                                     |
+| c5315   | 2318           |                                     |
 | c6288   | 2416           | 16×16 multiplier; per-fault timeout |
-| c7552   | 3712           | |
+| c7552   | 3712           |                                     |
+
+
+
 
 ### Deliverables
 
@@ -462,6 +550,8 @@ python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 - [ ] `c6288` per-fault timeout + progress logging
 
 ---
+
+
 
 ## Module 7 — Pattern compaction (Phase 2)
 
@@ -477,6 +567,8 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ---
 
+
+
 ## Pluggable parser interface (Module 1b)
 
 **Status:** pending
@@ -490,13 +582,15 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ---
 
+
+
 ## Suggested implementation order
 
-1. **Signal-centric `Circuit` model** — data classes + levelization
+1. **Signal-centric** `Circuit` **model** — data classes + levelization
 2. **ISCAS Verilog parser** — `c17.v` populates model correctly
 3. **Binary good-circuit simulator** — verify gate evaluation
 4. **Five-valued implication engine** — unit-test per gate type
-5. **Raw fault list (`signal_sa0/sa1`) + collapsing** — sanity-check counts on `c17`
+5. **Raw fault list (**`signal_sa0/sa1`**) + collapsing** — sanity-check counts on `c17`
 6. **PODEM** — single fault on `c17`, then batch
 7. **CLI + output files** — full pipeline
 8. **Full ISCAS'85 suite** — XOR tuning, `c6288` limits
@@ -504,7 +598,10 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ---
 
+
+
 ## Risks and mitigations
+
 
 | Risk                                               | Mitigation                                                                             |
 | -------------------------------------------------- | -------------------------------------------------------------------------------------- |
@@ -514,7 +611,10 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 | Over-aggressive collapsing                         | Validate with fault sim; compare collapsed counts to references                        |
 | `c6288` runtime                                    | Per-fault timeout; progress logging                                                    |
 
+
 ---
+
+
 
 ## Out of scope for v1
 
@@ -526,17 +626,26 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ---
 
+
+
 ## Repository
 
-| Host   | URL |
-|--------|-----|
-| GitHub | https://github.com/saravana-vikas/combinational-podem-atpg-v1 |
-| Cursor | https://cursor.com/codebase/saravana-vikas/combinational-podem-atpg-v1 |
+
+| Host   | URL                                                                                                                                              |
+| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GitHub | [https://github.com/saravana-vikas/combinational-podem-atpg-v1](https://github.com/saravana-vikas/combinational-podem-atpg-v1)                   |
+| Cursor | [https://cursor.com/codebase/saravana-vikas/combinational-podem-atpg-v1](https://cursor.com/codebase/saravana-vikas/combinational-podem-atpg-v1) |
+
 
 ---
 
+
+
 ## Changelog
 
-| Date | Module | Change |
-|------|--------|--------|
-| 2026-09-06 | — | Initial plan created |
+
+| Date       | Module | Change               |
+| ---------- | ------ | -------------------- |
+| 2026-09-06 | —      | Initial plan created |
+
+
