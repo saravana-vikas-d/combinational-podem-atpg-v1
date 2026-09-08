@@ -1,4 +1,5 @@
 from circuit.circuit import Gate, GateType, Signal
+from logic5 import Logic5
 
 
 def test_signal_defaults():
@@ -9,6 +10,7 @@ def test_signal_defaults():
     assert signal.driver is None
     assert signal.fanouts == []
     assert signal.level == -1
+    assert signal.value is Logic5.X
 
 
 def test_signal_primary_input():
@@ -42,9 +44,3 @@ def test_signal_fanouts():
     assert n3.fanouts == [(g1, 1)]
     assert g1.inputs[0] is n1
     assert g1.inputs[1] is n3
-
-
-# def test_signal_value_default():
-#     from logic5 import Logic5
-#     signal = Signal("N10")
-#     assert signal.value is Logic5.X

@@ -5,16 +5,16 @@
 ## Build progress
 
 
-| Module                                            | ID                    | Status  | Notes |
-| ------------------------------------------------- | --------------------- | ------- | ----- |
-| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | pending |       |
-| Pluggable parser interface; Yosys stub            | `parser-plugin`       | pending |       |
-| Five-valued forward implication and backtrace     | `sim-logic5`          | pending |       |
-| Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | pending |       |
-| PODEM loop, D-frontier, per-fault patterns        | `podem-core`          | pending |       |
-| CLI orchestration and output files                | `cli-outputs`         | pending |       |
-| End-to-end validation on ISCAS'85 suite           | `validate-benchmarks` | pending |       |
-| Fault simulator + pattern compaction (Phase 2)    | `compaction-optional` | pending |       |
+| Module                                            | ID                    | Status        | Notes                                                                 |
+| ------------------------------------------------- | --------------------- | ------------- | --------------------------------------------------------------------- |
+| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | `in_progress` | `GateType`, `Signal`, `Gate`, `Circuit` done; parser + levelize next |
+| Pluggable parser interface; Yosys stub            | `parser-plugin`       | pending       |                                                                       |
+| Five-valued forward implication and backtrace     | `sim-logic5`          | `in_progress` | `src/logic5.py` + tests done; `sim/implication.py` stub only          |
+| Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | pending       |                                                                       |
+| PODEM loop, D-frontier, per-fault patterns        | `podem-core`          | pending       |                                                                       |
+| CLI orchestration and output files                | `cli-outputs`         | pending       |                                                                       |
+| End-to-end validation on ISCAS'85 suite           | `validate-benchmarks` | pending       |                                                                       |
+| Fault simulator + pattern compaction (Phase 2)    | `compaction-optional` | pending       |                                                                       |
 
 
 **Legend:** `pending` → `in_progress` → `done`
@@ -102,7 +102,7 @@ Both parsers must produce the **same internal** `Circuit` **object** so ATPG, co
 
 Ship or download ISCAS'85 `.v` files (`c17`, `c432`, `c499`, `c880`, `c1355`, `c1908`, `c2670`, `c3540`, `c5315`, `c6288`, `c7552`). Use primitive-gate variants (e.g. `c880a.v` not cell-mapped `c880.v`).
 
-Benchmarks live in `benchmarks/`.
+Benchmarks live in `ISCAS85_Circuits/`. See also `parser.md` for Verilog dialect analysis and step-by-step parser plan.
 
 ---
 
@@ -172,7 +172,7 @@ classDiagram
 - **name**: Verilog identifier (e.g. `N1`, `n10`) — also the **fault site name**
 - **is_pi / is_po**: derived from port declarations
 - **driver**: the `Gate` driving this signal, or `None` for primary inputs
-- **fanouts**: list of `FanoutEdge(gate, input_index)` — every gate input this signal feeds
+- **fanouts**: list of `(gate, input_index)` tuples — every gate input this signal feeds (implemented as `list[tuple[Gate, int]]`, not a separate `FanoutEdge` class)
 - **value**: current five-valued logic during PODEM search (`0`, `1`, `X`, `D`, `D'`)
 - **level**: topological level (PIs = 0; others = driver gate level or max fanin level + 1)
 
@@ -293,20 +293,23 @@ flowchart LR
 ### Package layout
 
 
-| Path                          | Purpose                                             |
-| ----------------------------- | --------------------------------------------------- |
-| `src/parser/base.py`          | `NetlistParser` protocol / abstract base            |
-| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              |
-| `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2)                         |
-| `src/circuit/circuit.py`      | `Circuit`, `Gate`, `Signal`, `FanoutEdge`           |
-| `src/circuit/levelize.py`     | Topological level assignment                        |
-| `src/fault/fault.py`          | `Fault` with `signal_name_sa0/sa1` naming           |
-| `src/fault/collapsing.py`     | Equivalence + dominance collapsing                  |
-| `src/sim/logic5.py`           | Five-valued algebra (0, 1, X, D, D')                |
-| `src/sim/implication.py`      | Forward implication + backtrace                     |
-| `src/atpg/podem.py`           | PODEM main loop                                     |
-| `src/atpg/fault_sim.py`       | Parallel fault simulation (compaction + validation) |
-| `src/cli/main.py`             | Orchestration + file I/O                            |
+| Path                          | Purpose                                             | Status      |
+| ----------------------------- | --------------------------------------------------- | ----------- |
+| `src/parser/base.py`          | `NetlistParser` protocol / abstract base            | pending     |
+| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              | pending     |
+| `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2)                         | pending     |
+| `src/circuit/circuit.py`      | `Circuit`, `Gate`, `Signal`, `GateType`             | **done**    |
+| `src/circuit/levelize.py`     | Topological level assignment                        | pending     |
+| `src/fault/fault.py`          | `Fault` with `signal_name_sa0/sa1` naming           | pending     |
+| `src/fault/collapsing.py`     | Equivalence + dominance collapsing                  | pending     |
+| `src/logic5.py`               | Five-valued algebra (0, 1, X, D, D') + `eval_gate`  | **done**    |
+| `src/sim/implication.py`      | Forward implication + backtrace                       | stub only   |
+| `src/atpg/podem.py`           | PODEM main loop                                     | pending     |
+| `src/atpg/fault_sim.py`       | Parallel fault simulation (compaction + validation) | pending     |
+| `src/cli/main.py`             | Orchestration + file I/O                            | pending     |
+| `pyproject.toml`              | Project config + pytest                             | **done**    |
+| `tests/circuit/`              | Unit tests for circuit model                        | **partial** |
+| `tests/test_logic5.py`        | Unit tests for five-valued eval                     | **done**    |
 
 
 ---
@@ -315,15 +318,18 @@ flowchart LR
 
 ## Module 1 — Parser and circuit model
 
-**Status:** pending
+**Status:** `in_progress`
 
 ### Deliverables
 
-- [ ] `Circuit`, `Signal`, `Gate`, `FanoutEdge` data classes
+- [x] `GateType` enum with `from_v()` Verilog keyword mapping
+- [x] `Signal`, `Gate`, `Circuit` data classes (`Signal.fanouts` as `list[tuple[Gate, int]]`)
+- [x] `Signal.value: Logic5` (default `X`)
+- [x] Unit tests: `tests/circuit/test_gate_type.py`, `test_signal.py`, `test_circuit.py`
 - [ ] `levelize.py` — Kahn's algorithm, `Circuit.levels`
 - [ ] `iscas_verilog.py` — parse module, ports, wires, gate instances
 - [ ] Validation: single driver per net, acyclic, no unsupported constructs
-- [ ] Unit test: `benchmarks/c17.v` populates model with correct PI/PO/gate counts
+- [ ] Unit test: `ISCAS85_Circuits/c17.v` populates model with correct PI/PO/gate counts
 
 
 
@@ -388,7 +394,7 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 
 ## Module 3 — Five-valued simulation
 
-**Status:** pending
+**Status:** `in_progress`
 
 ### Logic5 values
 
@@ -406,10 +412,11 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 
 ### Deliverables
 
-- [ ] `logic5.py` — enum/algebra for all gate types
-- [ ] `implication.py` — levelized forward implication
-- [ ] `implication.py` — backtrace from gate output to controlling input values
-- [ ] Per-gate unit tests (especially XOR/XNOR controlling tables)
+- [x] `src/logic5.py` — `Logic5` enum + per-gate eval + `eval_gate()` (multi-input NAND/NOR/XNOR: fold primitive, invert once)
+- [x] Unit tests: `tests/test_logic5.py` (including D/D' cases and multi-input inverting gates)
+- [ ] `sim/implication.py` — levelized forward implication
+- [ ] `sim/implication.py` — backtrace from gate output to controlling input values
+- [ ] Per-gate backtrace / controlling tables (especially XOR on `c499`)
 
 ---
 
@@ -586,10 +593,10 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ## Suggested implementation order
 
-1. **Signal-centric** `Circuit` **model** — data classes + levelization
+1. ~~**Signal-centric** `Circuit` **model** — data classes~~ **`GateType`, `Signal`, `Gate`, `Circuit` done**; levelization next
 2. **ISCAS Verilog parser** — `c17.v` populates model correctly
-3. **Binary good-circuit simulator** — verify gate evaluation
-4. **Five-valued implication engine** — unit-test per gate type
+3. **Binary good-circuit simulator** — verify gate evaluation (optional; covered partly by `logic5` tests)
+4. ~~**Five-valued algebra** — `src/logic5.py` + `eval_gate`~~ **done**; implication + backtrace next
 5. **Raw fault list (**`signal_sa0/sa1`**) + collapsing** — sanity-check counts on `c17`
 6. **PODEM** — single fault on `c17`, then batch
 7. **CLI + output files** — full pipeline
@@ -644,8 +651,10 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 ## Changelog
 
 
-| Date       | Module | Change               |
-| ---------- | ------ | -------------------- |
-| 2026-09-06 | —      | Initial plan created |
+| Date       | Module         | Change                                                                                                      |
+| ---------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2026-09-08 | `parser-circuit` | Circuit model: `GateType`, `Signal`, `Gate`, `Circuit`; pytest scaffold; `parser.md`                        |
+| 2026-09-08 | `sim-logic5`   | `src/logic5.py`: `Logic5`, gate eval, `eval_gate` (fixed multi-input inverting gates); `Signal.value` wired |
+| 2026-09-06 | —              | Initial plan created                                                                                        |
 
 

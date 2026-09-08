@@ -1,3 +1,3 @@
-from circuit.circuit import Gate, GateType, Signal
+from circuit.circuit import Circuit, Gate, GateType, Signal
 
-__all__ = ["Gate", "GateType", "Signal"]
+__all__ = ["Circuit", "Gate", "GateType", "Signal"]
