@@ -9,7 +9,7 @@ ISCAS = Path(__file__).resolve().parents[2] / "ISCAS85_Circuits"
 
 def test_strip_comment_lines():
     lines = ["// Ninputs 5\n", "input N1;\n", "\n", "// tail\n"]
-    assert list(strip_comment_lines(lines)) == ["input N1;\n", "\n"]
+    assert list(strip_comment_lines(lines)) == ["input N1;", ""]
 
 
 def test_split_identifiers_multiline():

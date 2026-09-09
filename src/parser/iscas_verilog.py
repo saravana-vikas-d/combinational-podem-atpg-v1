@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from circuit.circuit import Circuit, Signal
+from circuit.circuit import Circuit, Gate, GateType, Signal
 from parser.verilog_utils import ParseError, iter_statements, split_identifiers
 
 _MODULE_RE = re.compile(
@@ -27,17 +27,25 @@ _GATE_KEYWORDS = frozenset(
 )
 
 
+_GATE_RE = re.compile(
+    r"^\s*(and|or|nand|nor|not|buf|xor|xnor)\s+"
+    r"([A-Za-z_]\w*)\s*"
+    r"\(\s*(.+?)\s*\)\s*;\s*$",
+    re.IGNORECASE,
+)
+
+_SINGLE_INPUT_GATE_TYPES = frozenset({GateType.NOT, GateType.BUF})
+
+
 @dataclass
 class _ParseContext:
     circuit: Circuit | None = None
     module_ports: list[str] | None = None
+    next_gate_id: int = 0
 
 
-def parse_iscas_declarations(path: str | Path) -> Circuit:
-    """Parse module, input, output, and wire declarations into a Circuit.
-
-    Gate instances are ignored in this phase and will be handled later.
-    """
+def parse_iscas_verilog(path: str | Path) -> Circuit:
+    """Parse an ISCAS-style structural Verilog netlist into a Circuit."""
     path = Path(path)
     context = _ParseContext()
 
@@ -50,6 +58,11 @@ def parse_iscas_declarations(path: str | Path) -> Circuit:
 
     _validate_module_ports(context.circuit, context.module_ports)
     return context.circuit
+
+
+def parse_iscas_declarations(path: str | Path) -> Circuit:
+    """Backward-compatible alias for :func:`parse_iscas_verilog`."""
+    return parse_iscas_verilog(path)
 
 
 def _apply_statement(context: _ParseContext, statement: str) -> None:
@@ -81,8 +94,9 @@ def _apply_statement(context: _ParseContext, statement: str) -> None:
             _add_wires(circuit, names)
         return
 
-    first = stripped.split(None, 1)[0]
+    first = stripped.split(None, 1)[0].lower()
     if first in _GATE_KEYWORDS:
+        _apply_gate(context, statement)
         return
 
     if stripped.startswith("assign "):
@@ -178,3 +192,79 @@ def _add_wires(circuit: Circuit, names: list[str]) -> None:
                 )
             raise ParseError(f"duplicate wire declaration for {name!r}")
         circuit.signals[name] = Signal(name=name)
+
+
+def _get_signal_for_gate(circuit: Circuit, name: str, context: str) -> Signal:
+    if name not in circuit.signals:
+        raise ParseError(f"undeclared signal {name!r} in {context}")
+    return circuit.signals[name]
+
+
+def _validate_gate_pin_count(
+    gate_type: GateType, instance_name: str, keyword: str, pin_count: int
+) -> None:
+    if gate_type in _SINGLE_INPUT_GATE_TYPES:
+        if pin_count != 2:
+            raise ParseError(
+                f"{instance_name}: {keyword} expects 2 pins (out, in), got {pin_count}"
+            )
+        return
+
+    if pin_count < 3:
+        raise ParseError(
+            f"{instance_name}: {keyword} expects at least 3 pins "
+            f"(out, in1, in2, ...), got {pin_count}"
+        )
+
+
+def _apply_gate(context: _ParseContext, statement: str) -> None:
+    circuit = context.circuit
+    assert circuit is not None
+
+    match = _GATE_RE.match(statement)
+    if not match:
+        raise ParseError(f"invalid gate instance: {statement!r}")
+
+    keyword = match.group(1)
+    instance_name = match.group(2)
+    try:
+        gate_type = GateType.from_v(keyword)
+    except ValueError as exc:
+        raise ParseError(str(exc)) from exc
+
+    pins = split_identifiers(match.group(3))
+    _validate_gate_pin_count(gate_type, instance_name, keyword, len(pins))
+
+    output_name = pins[0]
+    input_names = pins[1:]
+    gate_context = f"gate {instance_name!r}"
+
+    output_signal = _get_signal_for_gate(circuit, output_name, gate_context)
+    if output_signal.is_pi:
+        raise ParseError(
+            f"{instance_name}: primary input {output_name!r} cannot be a gate output"
+        )
+    if output_signal.driver is not None:
+        raise ParseError(
+            f"{instance_name}: signal {output_name!r} is already driven by "
+            f"{output_signal.driver.instance_name!r}"
+        )
+
+    input_signals = [
+        _get_signal_for_gate(circuit, name, gate_context) for name in input_names
+    ]
+
+    gate = Gate(
+        id=context.next_gate_id,
+        instance_name=instance_name,
+        type=gate_type,
+        inputs=input_signals,
+        output=output_signal,
+    )
+    context.next_gate_id += 1
+
+    output_signal.driver = gate
+    for index, input_signal in enumerate(input_signals):
+        input_signal.fanouts.append((gate, index))
+
+    circuit.gates.append(gate)

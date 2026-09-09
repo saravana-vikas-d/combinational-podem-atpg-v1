@@ -52,7 +52,7 @@ def iter_statements(lines: Iterable[str]) -> Iterator[str]:
         chunk = line.strip()
         if not chunk:
             continue
-        buffer = f"{buffer} {chunk}".strip() if buffer else chunk
+        buffer = f"{buffer}{chunk}".strip() if buffer else chunk
         while ";" in buffer:
             semicolon = buffer.index(";")
             statement = buffer[: semicolon + 1].strip()
