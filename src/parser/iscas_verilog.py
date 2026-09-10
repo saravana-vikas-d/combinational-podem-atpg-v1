@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from circuit.circuit import Circuit, Gate, GateType, Signal
+from circuit.levelize import CycleError, LevelizeError, levelize
+from circuit.validate import ValidationError, validate
 from parser.verilog_utils import ParseError, iter_statements, split_identifiers
 
 _MODULE_RE = re.compile(
@@ -57,6 +59,14 @@ def parse_iscas_verilog(path: str | Path) -> Circuit:
         raise ParseError(f"no module declaration found in {path}")
 
     _validate_module_ports(context.circuit, context.module_ports)
+    try:
+        validate(context.circuit, check_unused=True)
+    except ValidationError as exc:
+        raise ParseError(str(exc)) from exc
+    try:
+        levelize(context.circuit)
+    except LevelizeError as exc:
+        raise ParseError(str(exc)) from exc
     return context.circuit
 
 

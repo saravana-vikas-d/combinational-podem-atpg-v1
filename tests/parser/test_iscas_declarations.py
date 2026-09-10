@@ -56,7 +56,7 @@ def test_c17():
     circuit = parse_iscas_verilog(ISCAS / "c17.v")
 
     assert circuit.name == "c17"
-    assert circuit.levels == []
+    assert [len(level_gates) for level_gates in circuit.levels] == [2, 2, 2]
     assert len(circuit.gates) == 6
 
     expected_pi_names = ["N1", "N2", "N3", "N6", "N7"]
@@ -81,6 +81,7 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N1", "N3"],
         output_name="N10",
+        level=1,
     )
     _assert_gate(
         g1,
@@ -90,6 +91,7 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N3", "N6"],
         output_name="N11",
+        level=1,
     )
     _assert_gate(
         g2,
@@ -99,6 +101,7 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N2", "N11"],
         output_name="N16",
+        level=2,
     )
     _assert_gate(
         g3,
@@ -108,6 +111,7 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N11", "N7"],
         output_name="N19",
+        level=2,
     )
     _assert_gate(
         g4,
@@ -117,6 +121,7 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N10", "N16"],
         output_name="N22",
+        level=3,
     )
     _assert_gate(
         g5,
@@ -126,41 +131,47 @@ def test_c17():
         gate_type=GateType.NAND,
         input_names=["N16", "N19"],
         output_name="N23",
+        level=3,
     )
 
-    _assert_signal(circuit.signals["N1"], name="N1", is_pi=True, fanouts=[(g0, 0)])
-    _assert_signal(circuit.signals["N2"], name="N2", is_pi=True, fanouts=[(g2, 0)])
+    _assert_signal(circuit.signals["N1"], name="N1", is_pi=True, level=0, fanouts=[(g0, 0)])
+    _assert_signal(circuit.signals["N2"], name="N2", is_pi=True, level=0, fanouts=[(g2, 0)])
     _assert_signal(
         circuit.signals["N3"],
         name="N3",
         is_pi=True,
+        level=0,
         fanouts=[(g0, 1), (g1, 0)],
     )
-    _assert_signal(circuit.signals["N6"], name="N6", is_pi=True, fanouts=[(g1, 1)])
-    _assert_signal(circuit.signals["N7"], name="N7", is_pi=True, fanouts=[(g3, 1)])
+    _assert_signal(circuit.signals["N6"], name="N6", is_pi=True, level=0, fanouts=[(g1, 1)])
+    _assert_signal(circuit.signals["N7"], name="N7", is_pi=True, level=0, fanouts=[(g3, 1)])
 
     _assert_signal(
         circuit.signals["N10"],
         name="N10",
         driver=g0,
+        level=1,
         fanouts=[(g4, 0)],
     )
     _assert_signal(
         circuit.signals["N11"],
         name="N11",
         driver=g1,
+        level=1,
         fanouts=[(g2, 1), (g3, 0)],
     )
     _assert_signal(
         circuit.signals["N16"],
         name="N16",
         driver=g2,
+        level=2,
         fanouts=[(g4, 1), (g5, 0)],
     )
     _assert_signal(
         circuit.signals["N19"],
         name="N19",
         driver=g3,
+        level=2,
         fanouts=[(g5, 1)],
     )
 
@@ -169,12 +180,14 @@ def test_c17():
         name="N22",
         is_po=True,
         driver=g4,
+        level=3,
     )
     _assert_signal(
         circuit.signals["N23"],
         name="N23",
         is_po=True,
         driver=g5,
+        level=3,
     )
 
     for index, name in enumerate(expected_pi_names):

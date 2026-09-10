@@ -1,10 +1,13 @@
 from datetime import datetime
 from pathlib import Path
 
-from circuit.dump import dump_circuit, format_circuit
+import pytest
+
+from circuit.dump import dump_circuit, format_circuit, print_circuit_from_file
 from parser.iscas_verilog import parse_iscas_verilog
 
 ISCAS = Path(__file__).resolve().parents[2] / "ISCAS85_Circuits"
+CIRCUIT_PRINTS_DIR = Path(__file__).resolve().parents[2] / "Circuit_prints"
 
 
 def test_format_circuit_c17_contains_expected_sections():
@@ -21,7 +24,8 @@ def test_format_circuit_c17_contains_expected_sections():
     assert "PI  N3       driver=-            fanouts=NAND2_1[1], NAND2_2[0]" in text
     assert "PO  N22      driver=NAND2_5      fanouts=-" in text
     assert "W   N11      driver=NAND2_2      fanouts=NAND2_3[1], NAND2_4[0]" in text
-    assert "LEVELS\n  (not levelized)" in text
+    assert "LEVELS\n  level 0: NAND2_1, NAND2_2" in text
+    assert "  level 2: NAND2_5, NAND2_6" in text
 
 
 def test_dump_circuit_writes_timestamped_file(tmp_path):
@@ -32,3 +36,30 @@ def test_dump_circuit_writes_timestamped_file(tmp_path):
 
     assert path == tmp_path / "c17_10092026_0102.txt"
     assert path.read_text(encoding="utf-8") == format_circuit(circuit)
+
+
+def test_print_circuit_from_file_writes_to_tests_circuit_prints(tmp_path):
+    when = datetime(2026, 9, 10, 21, 38)
+    path = print_circuit_from_file(
+        ISCAS / "c17.v",
+        output_dir=tmp_path,
+        timestamp=when,
+    )
+
+    assert path == tmp_path / "c17_10092026_2138.txt"
+    assert path.read_text(encoding="utf-8") == format_circuit(
+        parse_iscas_verilog(ISCAS / "c17.v")
+    )
+
+
+@pytest.mark.parametrize(
+    "verilog_path",
+    [ISCAS / "c17.v"],
+)
+def test_print_circuit_from_file(verilog_path: Path):
+    when = datetime(2026, 9, 10, 21, 38)
+    path = print_circuit_from_file(verilog_path, timestamp=when)
+
+    assert path.parent.resolve() == CIRCUIT_PRINTS_DIR.resolve()
+    assert path.name == f"{verilog_path.stem}_{when.strftime('%d%m%Y_%H%M')}.txt"
+    assert f"CIRCUIT: {verilog_path.stem}" in path.read_text(encoding="utf-8")

@@ -282,19 +282,19 @@ flowchart TD
 
 ### Must handle
 
-- [ ] Multi-line `module`, `input`, `output`, `wire` declarations
-- [ ] Gate regex: optional space before `(`, flexible comma spacing
-- [ ] Fanin from pin count, not instance name
-- [ ] PIs as signals even when not declared as `wire`
-- [ ] Fanout list construction during gate parsing
-- [ ] Identifier charset including underscores (`N241_I`, `N241_O`)
-- [ ] All 8 gate keywords (including `xnor` for future netlists)
+- [x] Multi-line `module`, `input`, `output`, `wire` declarations
+- [x] Gate regex: optional space before `(`, flexible comma spacing
+- [x] Fanin from pin count, not instance name
+- [x] PIs as signals even when not declared as `wire`
+- [x] Fanout list construction during gate parsing
+- [x] Identifier charset including underscores (`N241_I`, `N241_O`)
+- [x] All 8 gate keywords (including `xnor` for future netlists)
 
 ### Validation checks
 
-- [ ] Single driver per non-PI signal
-- [ ] All gate-referenced signals declared
-- [ ] Acyclic graph (levelization succeeds)
+- [x] Single driver per non-PI signal (inline during gate parse + post-parse validate)
+- [x] All gate-referenced signals declared
+- [x] Acyclic graph (levelization succeeds; `CycleError` on loops)
 - [ ] Optional: compare parsed PI/PO/gate counts to header comments when present
 
 ### Not needed for v1 (based on this corpus)
@@ -329,8 +329,10 @@ Recommended parse tests in increasing complexity:
 
 | Path | Purpose |
 |------|---------|
-| `src/circuit/circuit.py` | `Circuit`, `Gate`, `Signal`, `FanoutEdge`, `GateType` |
+| `src/circuit/circuit.py` | `Circuit`, `Gate`, `Signal`, `GateType` |
+| `src/circuit/validate.py` | Post-parse validation |
 | `src/circuit/levelize.py` | Topological level assignment (Kahn) |
+| `src/circuit/dump.py` | Formatted circuit dump for manual verification |
 | `src/parser/base.py` | `NetlistParser` protocol / abstract base |
 | `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1) |
 | `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2) |
@@ -681,11 +683,11 @@ time python -c "from src.parser.iscas_verilog import parse; parse('ISCAS85_Circu
 
 From `plan.md`, the parser module is **done** when:
 
-- [ ] All deliverables in Steps 0–9 exist
+- [x] All deliverables in Steps 0–7 exist (Steps 8–10 pending)
 - [ ] `pytest tests/parser/ tests/circuit/` passes
-- [ ] **c17 checkpoint:** 5 PIs, 2 POs, 6 NAND gates, levelized
-- [ ] All 11 ISCAS85 circuits parse without error
-- [ ] `plan.md` status updated: `parser-circuit` → `done`
+- [x] **c17 checkpoint:** 5 PIs, 2 POs, 6 NAND gates, levelized (depth 3)
+- [ ] All 11 ISCAS85 circuits parse without error (smoke test pending)
+- [x] `plan.md` status updated: `parser-circuit` → `done`
 
 ### Practical tips while building
 

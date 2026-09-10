@@ -7,7 +7,7 @@
 
 | Module                                            | ID                    | Status        | Notes                                                                 |
 | ------------------------------------------------- | --------------------- | ------------- | --------------------------------------------------------------------- |
-| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | `in_progress` | `GateType`, `Signal`, `Gate`, `Circuit` done; parser + levelize next |
+| ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | `done`        | Full ISCAS parser, validate, levelize, dump; c17 checkpoint passed |
 | Pluggable parser interface; Yosys stub            | `parser-plugin`       | pending       |                                                                       |
 | Five-valued forward implication and backtrace     | `sim-logic5`          | `in_progress` | `src/logic5.py` + tests done; `sim/implication.py` stub only          |
 | Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | pending       |                                                                       |
@@ -296,10 +296,12 @@ flowchart LR
 | Path                          | Purpose                                             | Status      |
 | ----------------------------- | --------------------------------------------------- | ----------- |
 | `src/parser/base.py`          | `NetlistParser` protocol / abstract base            | pending     |
-| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              | pending     |
+| `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              | **done**    |
 | `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2)                         | pending     |
 | `src/circuit/circuit.py`      | `Circuit`, `Gate`, `Signal`, `GateType`             | **done**    |
-| `src/circuit/levelize.py`     | Topological level assignment                        | pending     |
+| `src/circuit/validate.py`     | Post-parse validation (drivers, unused wires)       | **done**    |
+| `src/circuit/levelize.py`     | Topological level assignment                        | **done**    |
+| `src/circuit/dump.py`         | Human-readable circuit dump for verification        | **done**    |
 | `src/fault/fault.py`          | `Fault` with `signal_name_sa0/sa1` naming           | pending     |
 | `src/fault/collapsing.py`     | Equivalence + dominance collapsing                  | pending     |
 | `src/logic5.py`               | Five-valued algebra (0, 1, X, D, D') + `eval_gate`  | **done**    |
@@ -308,7 +310,7 @@ flowchart LR
 | `src/atpg/fault_sim.py`       | Parallel fault simulation (compaction + validation) | pending     |
 | `src/cli/main.py`             | Orchestration + file I/O                            | pending     |
 | `pyproject.toml`              | Project config + pytest                             | **done**    |
-| `tests/circuit/`              | Unit tests for circuit model                        | **partial** |
+| `tests/circuit/`              | Unit tests for circuit model                        | **done**    |
 | `tests/test_logic5.py`        | Unit tests for five-valued eval                     | **done**    |
 
 
@@ -318,7 +320,7 @@ flowchart LR
 
 ## Module 1 — Parser and circuit model
 
-**Status:** `in_progress`
+**Status:** `done`
 
 ### Deliverables
 
@@ -326,10 +328,11 @@ flowchart LR
 - [x] `Signal`, `Gate`, `Circuit` data classes (`Signal.fanouts` as `list[tuple[Gate, int]]`)
 - [x] `Signal.value: Logic5` (default `X`)
 - [x] Unit tests: `tests/circuit/test_gate_type.py`, `test_signal.py`, `test_circuit.py`
-- [ ] `levelize.py` — Kahn's algorithm, `Circuit.levels`
-- [ ] `iscas_verilog.py` — parse module, ports, wires, gate instances
-- [ ] Validation: single driver per net, acyclic, no unsupported constructs
-- [ ] Unit test: `ISCAS85_Circuits/c17.v` populates model with correct PI/PO/gate counts
+- [x] `iscas_verilog.py` — parse module, ports, wires, gate instances (`parse_iscas_verilog`)
+- [x] `validate.py` — undriven PO/wire checks, unused wire check, connectivity sanity
+- [x] `levelize.py` — Kahn's algorithm, `Circuit.levels`, cycle detection
+- [x] `dump.py` + `circuit_print.py` — formatted `.txt` dumps to `Circuit_prints/`
+- [x] Unit test: `c17.v` full connectivity + levels (depth 3); gate tests on c432/c1355
 
 
 
@@ -593,10 +596,10 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 ## Suggested implementation order
 
-1. ~~**Signal-centric** `Circuit` **model** — data classes~~ **`GateType`, `Signal`, `Gate`, `Circuit` done**; levelization next
-2. **ISCAS Verilog parser** — `c17.v` populates model correctly
+1. ~~**Signal-centric** `Circuit` **model** — data classes~~ **done**
+2. ~~**ISCAS Verilog parser** — declarations, gates, validate, levelize~~ **done** (`c17` checkpoint passed)
 3. **Binary good-circuit simulator** — verify gate evaluation (optional; covered partly by `logic5` tests)
-4. ~~**Five-valued algebra** — `src/logic5.py` + `eval_gate`~~ **done**; implication + backtrace next
+4. ~~**Five-valued algebra** — `src/logic5.py` + `eval_gate`~~ **done**; **implication + backtrace next**
 5. **Raw fault list (**`signal_sa0/sa1`**) + collapsing** — sanity-check counts on `c17`
 6. **PODEM** — single fault on `c17`, then batch
 7. **CLI + output files** — full pipeline

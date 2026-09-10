@@ -143,3 +143,16 @@ def dump_circuit(
     path = target_dir / filename
     path.write_text(format_circuit(circuit), encoding="utf-8")
     return path
+
+
+def print_circuit_from_file(
+    verilog_path: str | Path,
+    output_dir: str | Path | None = None,
+    *,
+    timestamp: datetime | None = None,
+) -> Path:
+    """Parse a Verilog netlist and write a formatted circuit dump to disk."""
+    from parser.iscas_verilog import parse_iscas_verilog
+
+    circuit = parse_iscas_verilog(verilog_path)
+    return dump_circuit(circuit, output_dir, timestamp=timestamp)

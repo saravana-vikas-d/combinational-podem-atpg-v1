@@ -6,3 +6,4 @@ __pycache__/
 dist/
 build/
 Circuit_prints/
+tests/circuit/circuit_prints/
