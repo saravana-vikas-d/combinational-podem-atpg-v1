@@ -23,6 +23,12 @@ def _signal_role(signal: Signal) -> str:
     return "W"
 
 
+def _format_level(level: int) -> str:
+    if level < 0:
+        return "L-"
+    return f"L{level}"
+
+
 def _format_driver(signal: Signal) -> str:
     if signal.driver is None:
         return "-"
@@ -47,8 +53,11 @@ def _internal_wire_count(circuit: Circuit) -> int:
 
 
 def _write_summary(out: StringIO, circuit: Circuit) -> None:
-    level_groups = len(circuit.levels)
-    level_note = str(level_groups) if level_groups else "0 (not levelized)"
+    if circuit.levels:
+        max_gate_level = max(gate.level for gate in circuit.gates)
+        level_note = f"{len(circuit.levels)} groups, max gate level {max_gate_level}"
+    else:
+        level_note = "0 (not levelized)"
 
     out.write(f"{_LINE}\n")
     out.write(f"CIRCUIT: {circuit.name}\n")
@@ -66,12 +75,12 @@ def _write_summary(out: StringIO, circuit: Circuit) -> None:
 def _write_ports(out: StringIO, circuit: Circuit) -> None:
     out.write("PRIMARY INPUTS (declaration order)\n")
     for index, signal in enumerate(circuit.primary_inputs):
-        out.write(f"  [{index}] {signal.name}\n")
+        out.write(f"  [{index}] {signal.name} ({_format_level(signal.level)})\n")
     out.write("\n")
 
     out.write("PRIMARY OUTPUTS (declaration order)\n")
     for index, signal in enumerate(circuit.primary_outputs):
-        out.write(f"  [{index}] {signal.name}\n")
+        out.write(f"  [{index}] {signal.name} ({_format_level(signal.level)})\n")
     out.write("\n")
 
 
@@ -81,8 +90,8 @@ def _write_gates(out: StringIO, circuit: Circuit) -> None:
         inputs = ", ".join(signal.name for signal in gate.inputs)
         gate_type = gate.type.name.lower()
         out.write(
-            f"  [{gate.id}] {gate.instance_name:<12} {gate_type:<4} "
-            f"{gate.output.name}  <=  {inputs}\n"
+            f"  [{gate.id}] {gate.instance_name:<12} {_format_level(gate.level):<3} "
+            f"{gate_type:<4} {gate.output.name}  <=  {inputs}\n"
         )
     out.write("\n")
 
@@ -100,8 +109,8 @@ def _write_signals(out: StringIO, circuit: Circuit) -> None:
             current_role = role
 
         out.write(
-            f"{role:<3} {signal.name:<8} driver={_format_driver(signal):<12} "
-            f"fanouts={_format_fanouts(signal)}\n"
+            f"{role:<3} {signal.name:<8} {_format_level(signal.level):<3} "
+            f"driver={_format_driver(signal):<12} fanouts={_format_fanouts(signal)}\n"
         )
     out.write("\n")
 
@@ -113,8 +122,11 @@ def _write_levels(out: StringIO, circuit: Circuit) -> None:
         return
 
     for level_index, gates in enumerate(circuit.levels):
-        gate_names = ", ".join(gate.instance_name for gate in gates)
-        out.write(f"  level {level_index}: {gate_names}\n")
+        gate_level = gates[0].level if gates else level_index + 1
+        gate_names = ", ".join(
+            f"{gate.instance_name}({_format_level(gate.level)})" for gate in gates
+        )
+        out.write(f"  tier {level_index} ({_format_level(gate_level)}): {gate_names}\n")
 
 
 def format_circuit(circuit: Circuit) -> str:

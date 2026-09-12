@@ -12,7 +12,7 @@ sys.path.insert(0, str(_ROOT / "src"))
 from circuit.dump import print_circuit_from_file  # noqa: E402
 
 # --- edit this path, then run: python circuit_print.py ---
-VERILOG_PATH = _ROOT / "ISCAS85_Circuits" / "c17.v"
+VERILOG_PATH = _ROOT / "ISCAS85_Circuits" / "c7552.v"
 OUTPUT_DIR = _ROOT / "Circuit_prints"
 
 
