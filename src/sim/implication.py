@@ -242,67 +242,6 @@ def _backtrace_xnor(
     return _backtrace_xor(gate, xor_desired, input_index)
 
 
-def _input_good_rails(
-    gate: Gate,
-    active_fault: Fault | None = None,
-) -> list[int | None]:
-    return [
-        _good_rail(resolve_input_value(input_signal, gate, index, active_fault))
-        for index, input_signal in enumerate(gate.inputs)
-    ]
-
-
-def justification_already_satisfied(
-    gate: Gate,
-    desired: Logic5,
-    active_fault: Fault | None = None,
-) -> bool:
-    """Return True when existing inputs already justify ``desired`` on ``gate.output``.
-
-    Uses good-circuit rails at each input (including branch-fault overlays). For
-    gates where one controlling input suffices, any such input is enough; where
-    backtrace sets all inputs, every input must already match.
-    """
-    _validate_backtrace_desired(desired)
-    rails = _input_good_rails(gate, active_fault)
-
-    match gate.type:
-        case GateType.AND:
-            if desired is Logic5.ZERO:
-                return any(rail == 0 for rail in rails)
-            return bool(rails) and all(rail == 1 for rail in rails)
-        case GateType.OR:
-            if desired is Logic5.ONE:
-                return any(rail == 1 for rail in rails)
-            return bool(rails) and all(rail == 0 for rail in rails)
-        case GateType.NAND:
-            if desired is Logic5.ZERO:
-                return bool(rails) and all(rail == 1 for rail in rails)
-            return any(rail == 0 for rail in rails)
-        case GateType.NOR:
-            if desired is Logic5.ZERO:
-                return bool(rails) and all(rail == 1 for rail in rails)
-            return any(rail == 0 for rail in rails)
-        case GateType.NOT | GateType.BUF:
-            if len(gate.inputs) != 1:
-                return False
-            rail = rails[0]
-            target = 0 if desired is Logic5.ZERO else 1
-            return rail == target
-        case GateType.XOR | GateType.XNOR:
-            input_values = [
-                resolve_input_value(input_signal, gate, index, active_fault)
-                for index, input_signal in enumerate(gate.inputs)
-            ]
-            computed = eval_gate(gate.type, input_values)
-            if computed is Logic5.X:
-                return False
-            if computed is desired:
-                return True
-            return _assign_compatible(computed, desired)
-    return False
-
-
 def backtrace(
     gate: Gate,
     desired: Logic5,

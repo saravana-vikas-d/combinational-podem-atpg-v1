@@ -54,7 +54,10 @@ def _run_circuit_once(verilog_path: Path) -> tuple[CircuitCoverageRow, Path, Pat
     return _row_from_batch(circuit.name, batch), report_path, tp_path
 
 
-def _print_coverage_table(rows: list[CircuitCoverageRow]) -> None:
+def _format_coverage_table(rows: list[CircuitCoverageRow]) -> str:
+    import io
+
+    out = io.StringIO()
     headers = (
         "Circuit",
         "Total",
@@ -65,30 +68,34 @@ def _print_coverage_table(rows: list[CircuitCoverageRow]) -> None:
         "Abort",
         "Backtracks",
     )
-    print()
-    print("PODEM fault coverage (collapsed fault sites)")
-    print("-" * 88)
-    print(
+    out.write("\nPODEM fault coverage (collapsed fault sites)\n")
+    out.write("-" * 88 + "\n")
+    out.write(
         f"{headers[0]:<10} {headers[1]:>7} {headers[2]:>8} {headers[3]:>10} "
-        f"{headers[4]:>9} {headers[5]:>8} {headers[6]:>6} {headers[7]:>11}"
+        f"{headers[4]:>9} {headers[5]:>8} {headers[6]:>6} {headers[7]:>11}\n"
     )
-    print("-" * 88)
+    out.write("-" * 88 + "\n")
     for row in rows:
-        print(
+        out.write(
             f"{row.name:<10} {row.total_faults:>7} {row.covered:>8} "
             f"{row.coverage_percent:>9.2f}% {row.patterns:>9} "
-            f"{row.untestable:>8} {row.aborted:>6} {row.backtracks:>11}"
+            f"{row.untestable:>8} {row.aborted:>6} {row.backtracks:>11}\n"
         )
-    print("-" * 88)
+    out.write("-" * 88 + "\n")
     if rows:
         total_sites = sum(row.total_faults for row in rows)
         total_covered = sum(row.covered for row in rows)
         aggregate = 100.0 * total_covered / total_sites if total_sites else 0.0
-        print(
+        out.write(
             f"{'ALL':<10} {total_sites:>7} {total_covered:>8} "
-            f"{aggregate:>9.2f}% {'':>9} {'':>8} {'':>6} {'':>11}"
+            f"{aggregate:>9.2f}% {'':>9} {'':>8} {'':>6} {'':>11}\n"
         )
-    print()
+    out.write("\n")
+    return out.getvalue()
+
+
+def _print_coverage_table(rows: list[CircuitCoverageRow]) -> None:
+    print(_format_coverage_table(rows), end="")
 
 
 def _ntotal_gates(verilog_path: Path) -> int:
@@ -124,6 +131,12 @@ def main() -> None:
         paths = _discover_circuits()
         if not paths:
             raise SystemExit(f"no .v files under {ISCAS_DIR}")
+        print("Run order (smallest gate count first):", flush=True)
+        for index, path in enumerate(paths, start=1):
+            gates = _ntotal_gates(path)
+            gates_label = str(gates) if gates < 10**9 else "?"
+            print(f"  {index:2d}. {path.stem}  (NtotalGates={gates_label})", flush=True)
+        print(flush=True)
         rows: list[CircuitCoverageRow] = []
         for path in paths:
             print(f"Running PODEM on {path.name} ...", flush=True)
@@ -135,6 +148,18 @@ def main() -> None:
                 f"{row.patterns} patterns)"
             )
         _print_coverage_table(rows)
+        summary_path = _ROOT / "scripts" / "iscas_batch_latest.txt"
+        summary_path.parent.mkdir(parents=True, exist_ok=True)
+        header = (
+            f"ISCAS85 PODEM batch  limits: recursion={RECURSION_LIMIT} "
+            f"backtrack={BACKTRACK_LIMIT}\n"
+            f"Order: {', '.join(p.stem for p in paths)}\n"
+        )
+        summary_path.write_text(
+            header + _format_coverage_table(rows),
+            encoding="utf-8",
+        )
+        print(f"Summary written to {summary_path}", flush=True)
         return
 
     verilog_path = args.verilog or (ISCAS_DIR / "c17.v")

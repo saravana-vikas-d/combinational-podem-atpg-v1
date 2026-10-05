@@ -1,0 +1,19 @@
+Run order (smallest gate count first):
+   1. c17  (NtotalGates=6)
+   2. c432  (NtotalGates=160)
+   3. c499  (NtotalGates=202)
+   4. c880  (NtotalGates=383)
+   5. c1908  (NtotalGates=880)
+   6. c2670  (NtotalGates=1269)
+   7. c3540  (NtotalGates=1669)
+   8. c5315  (NtotalGates=2307)
+   9. c6288  (NtotalGates=2416)
+  10. c7552  (NtotalGates=3513)
+  11. c1355  (NtotalGates=?)
+  12. ex1  (NtotalGates=?)
+
+Running PODEM on c17.v ...
+  c17: 100.00% (34/34 faults, 16 patterns)
+Running PODEM on c432.v ...
+  c432: 74.07% (640/864 faults, 304 patterns)
+Running PODEM on c499.v ...

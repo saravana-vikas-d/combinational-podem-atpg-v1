@@ -25,7 +25,6 @@ from sim.implication import (
     backtrace,
     forward_imply,
     inject_fault,
-    justification_already_satisfied,
     reset_values,
     resolve_input_value,
 )
@@ -337,9 +336,6 @@ def _expand_objective_combos(
 
     gate = objective.gate
     desired = objective.desired
-    if justification_already_satisfied(gate, desired, fault):
-        return [(gate, desired, 0, [])]
-
     if objective.input_index is not None:
         indices = [objective.input_index]
     else:

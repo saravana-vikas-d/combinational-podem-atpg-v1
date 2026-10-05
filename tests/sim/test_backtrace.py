@@ -3,12 +3,7 @@ import pytest
 from circuit.circuit import Circuit, Gate, GateType, Signal
 from circuit.levelize import levelize
 from logic5 import Logic5
-from sim.implication import (
-    BacktraceError,
-    apply_backtrace,
-    backtrace,
-    justification_already_satisfied,
-)
+from sim.implication import BacktraceError, apply_backtrace, backtrace
 
 
 def _two_input_gate(gate_type: GateType, instance_name: str = "G1") -> Gate:
@@ -158,39 +153,3 @@ def test_apply_backtrace_detects_assignment_conflict():
     circuit.signals["a"].value = Logic5.ZERO
 
     assert apply_backtrace(circuit, gate, Logic5.ONE, 0) is False
-
-
-def test_justification_already_satisfied_and_output_zero_with_controlling_input():
-    gate = _two_input_gate(GateType.AND)
-    gate.inputs[1].value = Logic5.ZERO
-    gate.inputs[0].value = Logic5.X
-
-    assert justification_already_satisfied(gate, Logic5.ZERO) is True
-    assert justification_already_satisfied(gate, Logic5.ONE) is False
-
-
-def test_justification_already_satisfied_and_output_one_requires_all_inputs():
-    gate = _two_input_gate(GateType.AND)
-    gate.inputs[0].value = Logic5.ONE
-    gate.inputs[1].value = Logic5.X
-
-    assert justification_already_satisfied(gate, Logic5.ONE) is False
-
-    gate.inputs[1].value = Logic5.ONE
-    assert justification_already_satisfied(gate, Logic5.ONE) is True
-
-
-def test_justification_already_satisfied_or_output_one_with_controlling_input():
-    gate = _two_input_gate(GateType.OR)
-    gate.inputs[0].value = Logic5.X
-    gate.inputs[1].value = Logic5.ONE
-
-    assert justification_already_satisfied(gate, Logic5.ONE) is True
-
-
-def test_justification_already_satisfied_nand_output_one_with_controlling_zero():
-    gate = _two_input_gate(GateType.NAND)
-    gate.inputs[0].value = Logic5.DBAR
-    gate.inputs[1].value = Logic5.ONE
-
-    assert justification_already_satisfied(gate, Logic5.ONE) is True
