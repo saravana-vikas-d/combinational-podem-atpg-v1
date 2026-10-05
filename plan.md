@@ -9,8 +9,8 @@
 | ------------------------------------------------- | --------------------- | ------------- | --------------------------------------------------------------------- |
 | ISCAS Verilog parser, Circuit model, levelization | `parser-circuit`      | `done`        | Full ISCAS parser, validate, levelize, dump; c17 checkpoint passed |
 | Pluggable parser interface; Yosys stub            | `parser-plugin`       | pending       |                                                                       |
-| Five-valued forward implication and backtrace     | `sim-logic5`          | `in_progress` | `src/logic5.py` + tests done; `sim/implication.py` stub only          |
-| Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | pending       |                                                                       |
+| Five-valued forward implication and backtrace     | `sim-logic5`          | `done`        | `forward_imply`, branch injection, `backtrace`, `apply_backtrace`     |
+| Raw SA faults + equivalence/dominance collapsing  | `fault-collapse`      | **done**      | `src/fault/` + tests; `collapse_print.py` debug dumps                 |
 | PODEM loop, D-frontier, per-fault patterns        | `podem-core`          | pending       |                                                                       |
 | CLI orchestration and output files                | `cli-outputs`         | pending       |                                                                       |
 | End-to-end validation on ISCAS'85 suite           | `validate-benchmarks` | pending       |                                                                       |
@@ -18,6 +18,10 @@
 
 
 **Legend:** `pending` → `in_progress` → `done`
+
+### Discussion → deferred work
+
+Optimization ideas, alternative heuristics, and non-blocking enhancements raised during implementation discussions should be recorded in **`add_later.md`** (not left only in chat). v1 stays minimal; `add_later.md` is the backlog for post-v1 tuning.
 
 ---
 
@@ -204,7 +208,7 @@ classDiagram
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | Forward implication | For each level, evaluate each gate from its input signal values → write output signal value  |
 | Backtrace (PODEM)   | Start at a gate output signal; pick controlling values on input signals based on `Gate.type` |
-| Fault injection     | Set `signal.value` on the fault site; PODEM propagates D/D' from there                       |
+| Fault injection     | Stem: set `signal.value` to D/D'; branch: overlay at matching gate input during implication   |
 | Fault enumeration   | One SA0 + one SA1 per eligible `Signal` name                                                 |
 
 
@@ -212,12 +216,20 @@ classDiagram
 
 ### Fanout and fault sites
 
-ISCAS Verilog converted from legacy format often **already names fanout branches as separate wires** (e.g. `n8`, `n9` both driven from a stem). In that case, each wire is its own fault site — no extra expansion needed.
+When a signal has **fanout ≥ 2**, enumerate **stem + branch** fault sites before collapsing:
 
-When a **single wire fans out to multiple gates** (fanout > 1):
+| Site | Naming | SA faults |
+| ---- | ------ | --------- |
+| Line/stem | `{signal}_sa0`, `{signal}_sa1` | 2 |
+| Each fanout branch | `{signal}__{gate_instance}_{input_index}_sa0/sa1` | 2 per branch |
 
-- **v1 decision:** Treat the wire as **one fault site** (`wire_name_sa0`, `wire_name_sa1`). This is the standard line/stuck-at model used in most ATPG tools on gate-level Verilog.
-- **Optional later:** Expand into branch signals (`wire_name__g10_in0`, `wire_name__g11_in1`) if branch-fault accuracy is required.
+When **fanout ≤ 1** (including PIs, internal wires, POs with no loads), only the line site is used.
+
+Example: N3 with fanout 2 → 3 sites → 6 SA faults (`N3_sa0`, `N3_sa1`, `N3__NAND2_1_1_sa0`, …).
+
+ISCAS Verilog converted from legacy format sometimes **already names fanout branches as separate wires** — those appear as separate signals in the netlist; no extra expansion is applied beyond what `signal.fanouts` records.
+
+Branch faults in simulation: stem faults set `signal.value`; branch faults use `inject_fault()` + `forward_imply(circuit, active_fault)` with `resolve_input_value()` at the matching `(signal, gate_instance, input_index)` only. Collapsing uses encoded branch names at gate inputs via `fault_at_input()`.
 
 
 
@@ -236,18 +248,19 @@ When a **single wire fans out to multiple gates** (fanout > 1):
 
 | Form                | Example   | Meaning                       |
 | ------------------- | --------- | ----------------------------- |
-| `{signal_name}_sa0` | `n10_sa0` | Wire `n10` stuck-at-0         |
-| `{signal_name}_sa1` | `N1_sa1`  | Primary input `N1` stuck-at-1 |
+| `{signal_name}_sa0` | `n10_sa0` | Line/stem on wire `n10` stuck-at-0 |
+| `{signal_name}_sa1` | `N1_sa1`  | Line/stem on `N1` stuck-at-1 |
+| `{signal}__{gate}_{idx}_sa0` | `N3__NAND2_1_1_sa0` | Branch fault on N3 feeding `NAND2_1` input 1 |
 
 
 Rules:
 
 - Use the **exact Verilog wire/port identifier** (case-sensitive)
 - No gate-id or pin-index in the name
-- Collapsed-fault report lists representative name + members collapsed into it
+- Collapsed-fault report: one entry per rep with equivalent and dominated member lists
 - Untestable list uses the same names
 
-Internal `Fault` type: `Fault(signal_name: str, stuck_at: Literal[0, 1])` with string serialization `f"{signal_name}_sa{stuck_at}"`.
+Internal `Fault` type: `Fault(signal_name, stuck_at, gate_instance=None, input_index=None)` with string serialization via `format_fault()` / `parse_fault_name()`. Helpers: `line_fault()`, `branch_fault()`, `fault_at_input()`, `fault_at_output()`.
 
 ---
 
@@ -296,22 +309,29 @@ flowchart LR
 | Path                          | Purpose                                             | Status      |
 | ----------------------------- | --------------------------------------------------- | ----------- |
 | `src/parser/base.py`          | `NetlistParser` protocol / abstract base            | pending     |
+| `src/parser/verilog_utils.py` | Shared Verilog token/declaration helpers            | **done**    |
 | `src/parser/iscas_verilog.py` | ISCAS `.v` parser (v1)                              | **done**    |
 | `src/parser/yosys_verilog.py` | Yosys parser stub (phase 2)                         | pending     |
 | `src/circuit/circuit.py`      | `Circuit`, `Gate`, `Signal`, `GateType`             | **done**    |
 | `src/circuit/validate.py`     | Post-parse validation (drivers, unused wires)       | **done**    |
 | `src/circuit/levelize.py`     | Topological level assignment                        | **done**    |
 | `src/circuit/dump.py`         | Human-readable circuit dump for verification        | **done**    |
-| `src/fault/fault.py`          | `Fault` with `signal_name_sa0/sa1` naming           | pending     |
-| `src/fault/collapsing.py`     | Equivalence + dominance collapsing                  | pending     |
+| `src/fault/fault.py`          | `Fault`, `fault_name()`, `generate_raw_faults()`    | **done**    |
+| `src/fault/collapsing.py`     | `collapse_equivalence`, `collapse_dominance`, `CollapseResult` | **done**    |
+| `src/fault/dump.py`           | Collapse map debug dumps to `Collapse_prints/`      | **done**    |
+| `collapse_print.py`           | CLI helper: parse + collapse + dump (like `circuit_print.py`) | **done**    |
 | `src/logic5.py`               | Five-valued algebra (0, 1, X, D, D') + `eval_gate`  | **done**    |
-| `src/sim/implication.py`      | Forward implication + backtrace                       | stub only   |
+| `src/sim/implication.py`      | Forward implication, branch injection, backtrace      | **done**    |
 | `src/atpg/podem.py`           | PODEM main loop                                     | pending     |
 | `src/atpg/fault_sim.py`       | Parallel fault simulation (compaction + validation) | pending     |
 | `src/cli/main.py`             | Orchestration + file I/O                            | pending     |
-| `pyproject.toml`              | Project config + pytest                             | **done**    |
+| `circuit_print.py`            | CLI helper: parse + dump circuit to `Circuit_prints/` | **done**    |
 | `tests/circuit/`              | Unit tests for circuit model                        | **done**    |
+| `tests/parser/`               | Parser + Verilog utils tests                        | **done**    |
 | `tests/test_logic5.py`        | Unit tests for five-valued eval                     | **done**    |
+| `tests/sim/test_implication.py` | Forward implication tests                         | **done**    |
+| `tests/sim/test_backtrace.py`   | Backtrace + `apply_backtrace` tests               | **done**    |
+| `tests/fault/`                | Fault list + collapsing tests                       | **done**    |
 
 
 ---
@@ -324,7 +344,7 @@ flowchart LR
 
 ### Deliverables
 
-- [x] `GateType` enum with `from_v()` Verilog keyword mapping
+- [x] `GateType` enum with `from_v()` Verilog keyword mapping (no equivalence/dominance rules on enum — those live in Module 2)
 - [x] `Signal`, `Gate`, `Circuit` data classes (`Signal.fanouts` as `list[tuple[Gate, int]]`)
 - [x] `Signal.value: Logic5` (default `X`)
 - [x] Unit tests: `tests/circuit/test_gate_type.py`, `test_signal.py`, `test_circuit.py`
@@ -333,6 +353,7 @@ flowchart LR
 - [x] `levelize.py` — Kahn's algorithm, `Circuit.levels`, cycle detection
 - [x] `dump.py` + `circuit_print.py` — formatted `.txt` dumps to `Circuit_prints/`
 - [x] Unit test: `c17.v` full connectivity + levels (depth 3); gate tests on c432/c1355
+- [x] Parser tests: `tests/parser/test_iscas_declarations.py`, `test_verilog_utils.py`
 
 
 
@@ -348,7 +369,7 @@ c17: 5 PIs, 2 POs, 6 NAND gates, levelized
 
 ## Module 2 — Fault list and collapsing
 
-**Status:** pending
+**Status:** `done`
 
 ### Raw fault list (single stuck-at)
 
@@ -359,37 +380,139 @@ For every signal in the circuit (PIs, internal wires, PO nets):
 
 PO signals are included (fault on output net before the port).
 
+`generate_raw_faults(circuit)` returns line/stem SA0/SA1 plus branch SA0/SA1 for each fanout edge when fanout ≥ 2. Example: c17 has 11 signals but **34 raw faults** (3 multi-fanout nets × extra branches). No gate rules at this stage.
+
+### Core types (DECIDED)
+
+```python
+@dataclass(frozen=True, slots=True)
+class Fault:
+    signal_name: str
+    stuck_at: Literal[0, 1]
+
+def fault_name(signal_name: str, stuck_at: Literal[0, 1]) -> str:
+    return f"{signal_name}_sa{stuck_at}"
+
+CollapseMap = dict[str, tuple[set[str], set[str]]]
+# rep -> (equivalent_others, dominator_faults)
+
+@dataclass
+class CollapseResult:
+    collapse_map: CollapseMap
+    raw_count: int
+    equivalence_map: CollapseMap | None = None  # debug snapshot after equivalence
+```
+
+- **Representatives** = keys of `collapse_map` (no separate list).
+- **List 1 (`equivalent_others`):** other faults in the same equivalence class; **exclude the rep**; stored as `set[str]`.
+- **List 2 (`dominator_faults`):** dominator-side faults removed as PODEM targets; stored as `set[str]`; **may appear under multiple reps** (e.g. `z_sa1` under both `a_sa1` and `b_sa1` on a 2-input AND).
+- **Partition:** keys + list 1 form a strict partition; list 2 members are not keys and not in any list 1; list 2 may overlap across reps.
+- `sa0` and `sa1` on the **same signal** are independent faults (e.g. `N10_sa1` and `N10_sa0` may belong to different classes).
+- Equivalence/dominance rules live in `src/fault/collapsing.py`, **not** on `GateType`.
+
+### API (implemented)
+
+| Function | Purpose |
+| -------- | ------- |
+| `collapse_equivalence(circuit, faults)` | Phase 1 only → `CollapseMap` |
+| `collapse_dominance(circuit, eq_map)` | Phase 2 only → `CollapseMap` |
+| `collapse_faults(circuit, faults=None, *, store_equivalence_map=True)` | Both phases → `CollapseResult` |
+| `verify_collapse_partition(raw, collapse_map)` | Assert partition invariants (tests) |
+
+### Representative selection (DECIDED)
+
+After equivalence merging, pick one rep per class:
+
+1. Highest `signal.level` (nearest to POs in the forward cone)
+2. Tie-break: PO > wire > PI
+3. Tie-break: lexicographic signal name
+4. Optional later: smallest `distance_to_po` (shortest hop count to any PO) — see `add_later.md`
+
 ### Fault equivalence (collapse first)
 
-Rules operate on the **gate driving or fed by a signal**, using signal names in equivalence classes:
+Rules operate on **gate instances**; merge **fault objects** `(signal, stuck_at)`, not signals alone. Union–find over all equivalence pairs.
 
+| Gate     | Equivalence (for each input `Ii`, output `O`) |
+| -------- | --------------------------------------------- |
+| AND      | `Ii_sa0 ≡ O_sa0`                              |
+| OR       | `Ii_sa1 ≡ O_sa1`                              |
+| NAND     | `Ii_sa0 ≡ O_sa1`                              |
+| NOR      | `Ii_sa1 ≡ O_sa0`                              |
+| NOT      | `I_sa0 ≡ O_sa1`, `I_sa1 ≡ O_sa0`              |
+| BUF      | `I_sa0 ≡ O_sa0`, `I_sa1 ≡ O_sa1`              |
+| XOR/XNOR | **No input↔output equivalence**               |
 
-| Gate     | Equivalence examples                                          |
-| -------- | ------------------------------------------------------------- |
-| AND      | All input signals SA0 ≡ output signal SA0                     |
-| OR       | All input signals SA1 ≡ output signal SA1                     |
-| NAND     | All input signals SA0 ≡ output signal SA1                     |
-| NOR      | All input signals SA1 ≡ output signal SA0                     |
-| NOT/BUF  | Input signal SAx ≡ output signal SAx (inverted value for NOT) |
-| XOR/XNOR | **No input↔output equivalence**                               |
-
-
-Build equivalence classes; keep one representative per class (prefer output signal fault when tied).
+After equivalence: every fault is exactly one **key** or in one **list 1**; `dominator_faults` is empty.
 
 ### Fault dominance (collapse second)
 
-- On AND: `{input}_sa1` dominated by `{output}_sa1`
-- On OR: `{input}_sa0` dominated by `{output}_sa0`
-- Mirrored rules for NAND/NOR
+**Definition (test-set dominance):** fault **F₁ dominates F₂** when every test that detects F₂ also detects F₁ (`T(F₂) ⊆ T(F₁)`). F₁ has the larger (or equal) detection set.
 
-Report file maps `representative → [collapsed members]` using `signal_name_sa0/sa1` strings.
+**Collapse action:** remove the **dominator** (broader fault); **keep** the **dominated** (more specific fault). Copy the whole dominator class `{rep, list1, list2}` into **`dominator_faults`** of each dominated class rep; add dominator rep to `remove`; delete all `remove` keys at end. **Do not** add dominated reps to `remove`.
+
+Example — 2-input AND `(a, b → z)`:
+
+| Fault   | Detecting tests (illustrative) |
+| ------- | ------------------------------ |
+| `a_sa1` | `{(0,1)}`                      |
+| `b_sa1` | `{(1,0)}`                      |
+| `z_sa1` | `{(0,1), (1,0), (0,0)}`        |
+
+`z_sa1` dominates `a_sa1` and `b_sa1` → drop `z_sa1`, keep `a_sa1` and `b_sa1`; `z_sa1` appears in **both** their `dominator_faults` sets.
+
+| Gate     | Dominance (for each input `Ii`, output `O`) — dominator → dominated |
+| -------- | ------------------------------------------------------------------- |
+| AND      | `O_sa1` dominates `Ii_sa1` → drop `O_sa1`, keep each `Ii_sa1`     |
+| OR       | `O_sa0` dominates `Ii_sa0` → drop `O_sa0`, keep each `Ii_sa0`     |
+| NAND     | `O_sa0` dominates `Ii_sa1` → drop `O_sa0`, keep each `Ii_sa1`     |
+| NOR      | `O_sa1` dominates `Ii_sa0` → drop `O_sa1`, keep each `Ii_sa0`     |
+| NOT/BUF  | none (equivalence already merges)                                   |
+| XOR/XNOR | none                                                                |
+
+Traverse gates **high level → low level**. For each pair `(D, F)`: resolve `R_D = rep(D)`, `R_F = rep(F)`; union dominator class into `R_F`'s `dominator_faults`; `remove.add(R_D)`.
+
+### Debug dumps
+
+| Function | Output file |
+| -------- | ----------- |
+| `print_collapse_from_file()` | `Collapse_prints/<circuitname>_collapse_<DDMMYYYY_HHMM>.txt` |
+| `print_collapse_per_gate_from_file()` | `Collapse_prints/<circuitname>_collapse_per_gate_<DDMMYYYY_HHMM>.txt` |
+
+Both support optional full circuit dump when `print_circuit_enable=True`.
+
+Summary dump sections:
+- **AFTER EQUIVALENCE** (`CollapseResult.equivalence_map`)
+- **AFTER DOMINANCE** (`CollapseResult.collapse_map`)
+
+Per-gate trace (`collapse_faults(..., store_gate_steps=True)`):
+- **EQUIVALENCE — AFTER EACH GATE** (low → high), including `START` snapshot
+- **DOMINANCE — AFTER EACH GATE** (high → low), including `START` and `FINAL` snapshots
+
+### Collapse pipeline
+
+```text
+1. raw = generate_raw_faults(circuit)
+
+2. collapse_equivalence(...)
+   → rep -> (equivalent_set, {})
+
+3. collapse_dominance(...)
+   → attach dominator classes; delete removed reps
+
+4. verify_collapse_partition(...) in tests
+```
+
+### Coverage accounting
+
+When PODEM finds a test for rep `R`, mark covered: `{R} ∪ equivalent(R) ∪ dominator_faults(R)`. Do not run PODEM on non-key members.
 
 ### Deliverables
 
-- [ ] `Fault` type with `__str__` → `signal_sa0/sa1`
-- [ ] `generate_raw_faults(circuit)` → list of `Fault`
-- [ ] `collapse_faults(circuit, faults)` → representatives + collapse map
-- [ ] Sanity-check collapsed count on `c17`
+- [x] `src/fault/fault.py` — `Fault`, `fault_name()`, `generate_raw_faults()`
+- [x] `src/fault/collapsing.py` — separate equivalence/dominance functions + `CollapseResult`
+- [x] `src/fault/dump.py` + `collapse_print.py` — debug dumps to `Collapse_prints/`
+- [x] `tests/fault/test_collapsing.py` — AND gate + c17 partition invariants
+- [x] c17: raw = 34, collapsed < 34, partition holds
 
 ---
 
@@ -397,7 +520,7 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 
 ## Module 3 — Five-valued simulation
 
-**Status:** `in_progress`
+**Status:** `done`
 
 ### Logic5 values
 
@@ -417,9 +540,11 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 
 - [x] `src/logic5.py` — `Logic5` enum + per-gate eval + `eval_gate()` (multi-input NAND/NOR/XNOR: fold primitive, invert once)
 - [x] Unit tests: `tests/test_logic5.py` (including D/D' cases and multi-input inverting gates)
-- [ ] `sim/implication.py` — levelized forward implication
-- [ ] `sim/implication.py` — backtrace from gate output to controlling input values
-- [ ] Per-gate backtrace / controlling tables (especially XOR on `c499`)
+- [x] `sim/implication.py` — levelized forward implication (`reset_values`, `forward_imply`)
+- [x] `sim/implication.py` — stem/branch fault injection (`inject_fault`, `resolve_input_value`)
+- [x] `sim/implication.py` — backtrace (`backtrace`, per-gate `_backtrace_*`, `BacktraceError`)
+- [x] `sim/implication.py` — `apply_backtrace` (test helper: assign + `forward_imply`)
+- [x] Per-gate backtrace tables (AND/OR/NAND/NOR/NOT/BUF/XOR/XNOR); XOR unit tests (c499 validation in Module 6)
 
 ---
 
@@ -434,7 +559,7 @@ Report file maps `representative → [collapsed members]` using `signal_name_sa0
 1. Five-valued logic on every `Signal.value`
 2. Forward implication: walk `Circuit.levels`, evaluate gates
 3. Backtrace: from gate output signal to input signals
-4. Fault injection: for `n10_sa0`, force `signals["n10"].value = 0` in faulty machine
+4. Fault injection: stem `n10_sa0` → `signals["n10"].value = D`; branch `N3__NAND2_1_1_sa0` → overlay at that gate input during `forward_imply(circuit, active_fault)`
 
 
 
@@ -469,13 +594,61 @@ flowchart TD
 
 
 
+### Heuristics (v1)
+
+
+| Decision | Choice |
+| -------- | ------ |
+| D-frontier gate | **Highest `gate.level`** (closest to PO — classic PODEM) |
+| Input to justify | PI first → lowest `signal.level` → `X` → `D`/`D'` |
+| Gate output desired | Try `0` then `1` via `backtrace(gate, desired, input_index)` |
+| Pattern format | `int \| None` per PI (`None` = don't-care `X`); at least one care bit (`0` or `1`) |
+| Backtracking | Snapshot/restore assignment stack (debug-printable) |
+
+Alternative D-frontier policies, X-aware pattern compaction, and other tuning → `add_later.md`.
+
+
+
+
+### Pattern format
+
+- **Internal:** `Pattern = tuple[int | None, ...]` in `circuit.primary_inputs` order (`None` = `X`).
+- **PI with `D`/`D'`** (faulted PI): map to good-circuit rail (`D` → `1`, `D'` → `0`) — not `X`.
+- **Success check:** at least one PI must be `0` or `1` (care bit); others may stay `X`.
+- **`.tp` file:** emit `0`/`1`/`X` per line (don't-care preserved; no arbitrary fill in v1).
+- **Compaction:** dropping or merging `X`-patterns requires fault simulation — Module 7 / `add_later.md`.
+
+
+
+
+### API (`src/atpg/podem.py` — build in this order)
+
+
+| # | Function / type | Purpose |
+| - | --------------- | ------- |
+| 1 | `PodemStatus`, `PodemResult`, `Pattern` | Result types (`success` / `untestable` / `aborted`; pattern + backtrack count) |
+| 2 | `fault_detected_at_po(circuit)` | Any PO has `D` or `D'` |
+| 3 | `find_d_frontier(circuit, active_fault)` | Gates with output `X` and a `D`/`D'` input (`resolve_input_value` for branches) |
+| 4 | `pi_pattern_bit(value)` | Map `Logic5` → `0` / `1` / `None` (`X`); `D`/`D'` → good rail |
+| 5 | `extract_pattern(circuit)` | Build `Pattern` from PI values; require ≥1 care bit |
+| 6 | `select_d_frontier_gate(frontier)` | `max(gate.level)` |
+| 7 | `iter_input_indices(gate, active_fault)` | Input priority order for justification |
+| 8 | `AssignmentFrame`, snapshot/restore helpers | Backtrack stack (printable for debug) |
+| 9 | `_podem_rec(...)` | Recursive search: desired `0`/`1` → backtrace → assign → imply → recurse |
+| 10 | `podem(circuit, fault, *, backtrack_limit=None)` | Top-level: reset → inject → imply → `_podem_rec` |
+| 11 | `format_pattern(pattern) -> str` | e.g. `(1, None, 0)` → `"10X"` for `.tp` output |
+| 12 | `run_podem_on_collapsed(circuit, collapse_map, ...)` | Batch on collapse reps; coverage expansion via `all_collapsed_members` |
+
+
+
+
 ### Deliverables
 
-- [ ] D-frontier detection
-- [ ] PODEM recursive search with backtracking
-- [ ] Per-fault pattern output (PI bit vector in port order)
-- [ ] Single-fault test on `c17`
-- [ ] Batch run over collapsed fault list
+- [ ] D-frontier detection (`find_d_frontier`)
+- [ ] PODEM recursive search with snapshot/restore backtracking (`podem`, `_podem_rec`)
+- [ ] Per-fault pattern output (`extract_pattern`, `format_pattern`; `X` allowed)
+- [ ] Single-fault test on `c17` (e.g. `N3_sa0`)
+- [ ] Batch run over collapsed fault list (`run_podem_on_collapsed`)
 
 ---
 
@@ -509,8 +682,8 @@ python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 
 | File                    | Contents                                                                 |
 | ----------------------- | ------------------------------------------------------------------------ |
-| `test_patterns.tp`      | One line per pattern: `0/1` values in PI port order                      |
-| `collapsed_faults.txt`  | Representative `signal_sa0/sa1` + collapsed members                      |
+| `test_patterns.tp`      | One line per pattern: `0`/`1`/`X` in PI port order (`X` = don't-care)   |
+| `collapsed_faults.txt`  | Per rep: `signal_sa0/sa1` key + equivalent list (list 1) + dominated list (list 2) |
 | `untestable_faults.txt` | `signal_sa0/sa1` + reason (`redundant` / `aborted`)                      |
 | `summary.json`          | Circuit, parser used, raw/collapsed fault counts, pattern count, runtime |
 
@@ -567,11 +740,12 @@ python -m atpg --circuit synth/c432_mapped.v --parser yosys ...
 
 **Status:** pending (deferred)
 
-Requires fault simulator + greedy set cover on patterns from Module 4.
+Requires fault simulator + greedy set cover on patterns from Module 4. See **`add_later.md`** — “Pattern compaction: X-aware redundancy” for subsumption rules (`X` patterns need fault-sim before dropping).
 
 ### Deliverables
 
 - [ ] `fault_sim.py` — parallel fault simulation
+- [ ] X-aware redundant-pattern removal (subsumption + fault coverage)
 - [ ] Greedy set-cover compaction
 - [ ] Compacted pattern count in `summary.json`
 
@@ -599,8 +773,8 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 1. ~~**Signal-centric** `Circuit` **model** — data classes~~ **done**
 2. ~~**ISCAS Verilog parser** — declarations, gates, validate, levelize~~ **done** (`c17` checkpoint passed)
 3. **Binary good-circuit simulator** — verify gate evaluation (optional; covered partly by `logic5` tests)
-4. ~~**Five-valued algebra** — `src/logic5.py` + `eval_gate`~~ **done**; **implication + backtrace next**
-5. **Raw fault list (**`signal_sa0/sa1`**) + collapsing** — sanity-check counts on `c17`
+4. ~~**Five-valued algebra + implication + backtrace**~~ **done**
+5. ~~**Raw fault list (**`signal_sa0/sa1`**) + collapsing** — sanity-check counts on `c17`~~ **done**
 6. **PODEM** — single fault on `c17`, then batch
 7. **CLI + output files** — full pipeline
 8. **Full ISCAS'85 suite** — XOR tuning, `c6288` limits
@@ -618,7 +792,7 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 | Verilog dialect differences across benchmark repos | Pin one upstream source; document expected gate syntax                                 |
 | XOR/XNOR PODEM bugs                                | Gate-specific controlling tables; test `c499` early                                    |
 | Signal name collisions after Yosys                 | Yosys parser normalizes names; keep internal IDs separate from display names if needed |
-| Over-aggressive collapsing                         | Validate with fault sim; compare collapsed counts to references                        |
+| Over-aggressive collapsing                         | Partition invariant tests; test-set dominance sanity (AND/OR examples); compare counts on c17 |
 | `c6288` runtime                                    | Per-fault timeout; progress logging                                                    |
 
 
@@ -656,7 +830,13 @@ Requires fault simulator + greedy set cover on patterns from Module 4.
 
 | Date       | Module         | Change                                                                                                      |
 | ---------- | -------------- | ----------------------------------------------------------------------------------------------------------- |
+| 2026-09-14 | `fault-collapse` | Branch fault sites: stem + fanout branches when fanout ≥ 2; encoded names; collapsing uses `fault_at_input`/`fault_at_output`; c17 raw = 34 |
+| 2026-09-13 | `fault-collapse` | Module 2 implemented: `fault.py`, `collapsing.py`, `dump.py`, `collapse_print.py`, tests; sets + dominator_faults partition |
+| 2026-09-13 | `fault-collapse` | Module 2 spec locked: equivalence rules, test-set dominance (drop output/dominator, keep input/dominated), `CollapseResult`, rep selection, collapse pipeline |
+| 2026-09-08 | `parser-circuit` | ISCAS parser, validate, levelize, dump; c17 checkpoint; parser tests                                       |
 | 2026-09-08 | `parser-circuit` | Circuit model: `GateType`, `Signal`, `Gate`, `Circuit`; pytest scaffold; `parser.md`                        |
+| 2026-09-23 | `podem-core`   | Module 4 spec locked: high-level D-frontier, `X` patterns, desired `0` then `1`, snapshot backtrack; API table; defer tuning to `add_later.md` |
+| 2026-09-23 | `sim-logic5`   | Module 3 complete: `backtrace`, per-gate tables, `BacktraceError`, `apply_backtrace` (tests); branch-aware `inject_fault` |
 | 2026-09-08 | `sim-logic5`   | `src/logic5.py`: `Logic5`, gate eval, `eval_gate` (fixed multi-input inverting gates); `Signal.value` wired |
 | 2026-09-06 | —              | Initial plan created                                                                                        |
 
