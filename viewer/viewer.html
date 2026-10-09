@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Circuit viewer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.28.1/cytoscape.min.js"></script>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #1c2833;
+      --muted: #5d6d7e;
+      --line: #d5dce3;
+      --panel: #ffffff;
+      --warn: #7b341e;
+      --filtered: #7b341e;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      font: 14px/1.4 system-ui, sans-serif;
+      color: var(--ink);
+      background: #f4f6f8;
+    }
+    #app {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 340px;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100%;
+    }
+    header {
+      grid-column: 1 / -1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+      align-items: center;
+      padding: 8px 12px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--line);
+    }
+    header h1 { font-size: 16px; margin: 0 8px 0 0; }
+    label { display: inline-flex; gap: 4px; align-items: center; color: var(--muted); }
+    input[type="search"], input[type="number"], input[type="file"] { font: inherit; }
+    input[type="search"] { width: 220px; }
+    input[type="number"] { width: 64px; }
+    button { font: inherit; padding: 4px 8px; }
+    #cy { background: #fbfcfd; }
+    aside {
+      border-left: 1px solid var(--line);
+      background: var(--panel);
+      overflow: auto;
+      padding: 12px;
+    }
+    #status { margin: 0 0 8px; }
+    #view-mode.filtered { color: var(--filtered); font-weight: 650; }
+    #warnings { margin: 0 0 12px; padding-left: 18px; color: var(--warn); }
+    #warnings:empty { display: none; }
+    #results { display: flex; flex-direction: column; gap: 4px; margin: 0 0 12px; }
+    #results button { text-align: left; }
+    dl { margin: 0; display: grid; grid-template-columns: 108px 1fr; gap: 4px 8px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; overflow-wrap: anywhere; }
+    h2 { font-size: 13px; margin: 16px 0 8px; }
+    #library-error {
+      margin: 12px;
+      padding: 12px;
+      background: #fff4e5;
+      border: 1px solid #e6c08a;
+    }
+  </style>
+</head>
+<body>
+  <p id="library-error" hidden>
+    Cytoscape.js did not load. Open this page through the local server while online,
+    or check that the CDN script can be reached.
+  </p>
+  <div id="app">
+    <header>
+      <h1>Circuit viewer</h1>
+      <input id="search" type="search" placeholder="Signal, instance, or gate ID" aria-label="Search">
+      <button id="search-btn" type="button">Search</button>
+      <button id="fit" type="button">Fit view</button>
+      <label>Upstream <input id="hops-up" type="number" min="0" max="50" value="1"></label>
+      <label>Downstream <input id="hops-down" type="number" min="0" max="50" value="1"></label>
+      <button id="neighborhood" type="button">Show neighborhood</button>
+      <button id="full" type="button">Show full circuit</button>
+      <label><input id="show-gates" type="checkbox" checked> Gates</label>
+      <label><input id="show-signals" type="checkbox" checked> Signals</label>
+      <label><input id="show-labels" type="checkbox"> Pin labels</label>
+      <label><input id="show-fault" type="checkbox" checked> Fault</label>
+      <label><input id="show-frontier" type="checkbox" checked> D-frontier</label>
+      <label><input id="show-values" type="checkbox" checked> Values</label>
+      <button id="reload" type="button">Reload snapshot</button>
+      <label>Open JSON <input id="file" type="file" accept="application/json,.json"></label>
+    </header>
+    <div id="cy"></div>
+    <aside>
+      <p id="status">No snapshot loaded.</p>
+      <p id="view-mode"></p>
+      <ul id="warnings"></ul>
+      <h2>Search results</h2>
+      <div id="results"></div>
+      <h2>Details</h2>
+      <dl id="details"></dl>
+    </aside>
+  </div>
+  <script>
+    const statusEl = document.getElementById("status");
+    const viewEl = document.getElementById("view-mode");
+    const warningsEl = document.getElementById("warnings");
+    const detailsEl = document.getElementById("details");
+    const resultsEl = document.getElementById("results");
+    const params = new URLSearchParams(location.search);
+    let snapshotUrl = params.get("snapshot") || "output/circuit.json";
+    let graph = null;
+    let cy = null;
+    let focusSet = null;
+    let focusHops = 0;
+    let labelsByZoom = false;
+
+    function setText(el, text) {
+      el.textContent = text;
+    }
+
+    function clearChildren(el) {
+      while (el.firstChild) el.removeChild(el.firstChild);
+    }
+
+    function addRow(key, value) {
+      const dt = document.createElement("dt");
+      dt.textContent = key;
+      const dd = document.createElement("dd");
+      dd.textContent = value == null || value === "" ? "—" : String(value);
+      detailsEl.appendChild(dt);
+      detailsEl.appendChild(dd);
+    }
+
+    function showDetails(element) {
+      clearChildren(detailsEl);
+      if (!element || element.empty()) {
+        addRow("Selection", "none");
+        return;
+      }
+      const data = element.data();
+      if (element.isNode() && data.kind === "signal") {
+        addRow("Kind", "signal");
+        addRow("Name", data.name);
+        addRow("Value", data.value);
+        addRow("Level", data.level);
+        addRow("Primary input", data.is_pi);
+        addRow("Primary output", data.is_po);
+        addRow("Driver gate", data.driver_gate_id);
+        addRow("Driver instance", data.driver_instance);
+        addRow("Fanout count", data.fanout_count);
+        element.connectedEdges().forEach((edge) => {
+          const edgeData = edge.data();
+          if (edgeData.kind === "input") {
+            addRow(
+              "Fanout",
+              edgeData.instance_name + "[" + edgeData.input_index + "] gate " + edgeData.gate_id
+            );
+          }
+        });
+      } else if (element.isNode()) {
+        addRow("Kind", "gate");
+        addRow("Gate ID", data.gate_id);
+        addRow("Instance", data.instance_name);
+        addRow("Type", data.gate_type);
+        addRow("Level", data.level);
+        addRow("Inputs", (data.inputs || []).join(", "));
+        addRow("Output", data.output);
+        addRow("D-frontier", data.d_frontier);
+      } else {
+        addRow("Kind", data.kind + " connection");
+        addRow("Signal", data.signal);
+        addRow("Gate ID", data.gate_id);
+        addRow("Instance", data.instance_name);
+        addRow("Input index", data.input_index);
+        addRow("Fault site", data.fault_site);
+      }
+      if (data.fault_site && graph && graph.fault) {
+        addRow("Fault kind", graph.fault.kind);
+        addRow("Stuck-at", graph.fault.stuck_at);
+      }
+    }
+
+    function renderWarnings() {
+      clearChildren(warningsEl);
+      const warnings = (graph && graph.warnings) || [];
+      warnings.forEach((warning) => {
+        const item = document.createElement("li");
+        item.textContent = warning;
+        warningsEl.appendChild(item);
+      });
+      const declared = graph && graph.counts;
+      if (declared && cy) {
+        const signals = cy.nodes('[kind = "signal"]').length;
+        const gates = cy.nodes('[kind = "gate"]').length;
+        const edges = cy.edges().length;
+        if (
+          signals !== declared.signals ||
+          gates !== declared.gates ||
+          edges !== declared.edges
+        ) {
+          const item = document.createElement("li");
+          item.textContent =
+            "Snapshot counts do not match loaded elements. Nothing was dropped on purpose; check the JSON.";
+          warningsEl.appendChild(item);
+        }
+      }
+    }
+
+    function updateStatus() {
+      if (!graph || !cy) {
+        setText(statusEl, "No snapshot loaded.");
+        setText(viewEl, "");
+        viewEl.classList.remove("filtered");
+        return;
+      }
+      const counts = graph.counts;
+      const total = cy.nodes().length;
+      const visible = cy.nodes(":visible").length;
+      setText(
+        statusEl,
+        graph.name + " — " + counts.signals + " signals, " + counts.gates +
+        " gates, " + counts.edges + " edges"
+      );
+      if (focusSet) {
+        setText(
+          viewEl,
+          "Filtered neighborhood (" + focusHops + "): showing " +
+          visible + " of " + total + " nodes. Hidden elements are still in the snapshot."
+        );
+        viewEl.classList.add("filtered");
+      } else {
+        setText(viewEl, "Full circuit: " + total + " nodes, " + cy.edges().length + " edges.");
+        viewEl.classList.remove("filtered");
+      }
+    }
+
+    function applyOverlays() {
+      const faultOn = document.getElementById("show-fault").checked;
+      const frontierOn = document.getElementById("show-frontier").checked;
+      const valuesOn = document.getElementById("show-values").checked;
+      cy.elements().removeClass("fault-on");
+      cy.nodes().removeClass("frontier-on");
+      cy.nodes().removeClass("values-off");
+      if (faultOn) {
+        cy.elements().filter((ele) => ele.data("fault_site")).addClass("fault-on");
+      }
+      if (frontierOn) {
+        cy.nodes().filter((node) => node.data("d_frontier")).addClass("frontier-on");
+      }
+      if (!valuesOn) cy.nodes('[kind = "signal"]').addClass("values-off");
+    }
+
+    function applyVisibility() {
+      const showGates = document.getElementById("show-gates").checked;
+      const showSignals = document.getElementById("show-signals").checked;
+      cy.elements().removeClass("filtered-out");
+      cy.nodes().forEach((node) => {
+        const kind = node.data("kind");
+        let hide = false;
+        if (kind === "gate" && !showGates) hide = true;
+        if (kind === "signal" && !showSignals) hide = true;
+        if (focusSet && !focusSet.has(node.id())) hide = true;
+        if (hide) node.addClass("filtered-out");
+      });
+      cy.edges().forEach((edge) => {
+        if (edge.source().hasClass("filtered-out") || edge.target().hasClass("filtered-out")) {
+          edge.addClass("filtered-out");
+        }
+      });
+      updateStatus();
+    }
+
+    function applyEdgeLabels() {
+      const showAll = document.getElementById("show-labels").checked || labelsByZoom;
+      cy.edges().toggleClass("show-label", showAll);
+      cy.edges(":selected").addClass("show-label");
+    }
+
+    function applyLevelLayout() {
+      const groups = new Map();
+      cy.nodes().forEach((node) => {
+        const level = Number(node.data("level"));
+        const safe = Number.isFinite(level) ? level : 0;
+        const key = node.data("kind") === "gate" ? safe * 2 - 1 : safe * 2;
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(node);
+      });
+      const levels = Array.from(groups.keys()).sort((a, b) => a - b);
+      const xGap = 180;
+      const yGap = 76;
+      levels.forEach((level, column) => {
+        const group = groups.get(level);
+        group.sort((a, b) => {
+          const left = a.data();
+          const right = b.data();
+          const leftKind = left.kind === "gate" ? 0 : 1;
+          const rightKind = right.kind === "gate" ? 0 : 1;
+          if (leftKind !== rightKind) return leftKind - rightKind;
+          if (leftKind === 0) return left.gate_id - right.gate_id;
+          return String(left.name).localeCompare(String(right.name));
+        });
+        const span = (group.length - 1) * yGap;
+        group.forEach((node, row) => {
+          node.position({ x: column * xGap, y: row * yGap - span / 2 });
+        });
+      });
+    }
+
+    function loadGraph(next) {
+      graph = next;
+      focusSet = null;
+      focusHops = 0;
+      clearChildren(resultsEl);
+      cy.elements().remove();
+      cy.add(graph.elements || { nodes: [], edges: [] });
+      applyLevelLayout();
+      applyOverlays();
+      applyVisibility();
+      applyEdgeLabels();
+      cy.fit(undefined, 30);
+      cy.resize();
+      renderWarnings();
+      showDetails(null);
+      updateStatus();
+    }
+
+    function selectedNode() {
+      const selected = cy.nodes(":selected");
+      if (selected.length) return selected[0];
+      const edge = cy.edges(":selected");
+      return edge.length ? edge[0].source() : null;
+    }
+
+    function showNeighborhood() {
+      const node = selectedNode();
+      if (!node) {
+        setText(viewEl, "Select a signal or gate, then show its neighborhood.");
+        viewEl.classList.add("filtered");
+        return;
+      }
+      const upstream = Math.max(0, Number(document.getElementById("hops-up").value) || 0);
+      const downstream = Math.max(0, Number(document.getElementById("hops-down").value) || 0);
+      const keep = new Set([node.id()]);
+      function walk(hops, direction) {
+        let wave = new Set([node.id()]);
+        for (let step = 0; step < hops; step += 1) {
+          const next = new Set();
+          wave.forEach((id) => {
+            const current = cy.getElementById(id);
+            current[direction]("node").forEach((other) => {
+              if (!keep.has(other.id())) next.add(other.id());
+            });
+          });
+          next.forEach((id) => keep.add(id));
+          wave = next;
+        }
+      }
+      walk(upstream, "incomers");
+      walk(downstream, "outgoers");
+      focusSet = keep;
+      focusHops = upstream + " upstream / " + downstream + " downstream";
+      applyVisibility();
+      cy.fit(cy.elements(":visible"), 30);
+    }
+
+    function showFull() {
+      focusSet = null;
+      applyVisibility();
+      cy.fit(cy.elements(":visible"), 30);
+    }
+
+    function nodeLabel(node) {
+      const data = node.data();
+      if (data.kind === "signal") return data.name;
+      return data.instance_name + " (g" + data.gate_id + ")";
+    }
+
+    function selectNode(node, reveal) {
+      cy.elements().unselect();
+      if (reveal && focusSet && !focusSet.has(node.id())) showFull();
+      node.select();
+      showDetails(node);
+      cy.animate({ center: { eles: node }, duration: 150 });
+    }
+
+    function runSearch() {
+      const query = document.getElementById("search").value.trim();
+      clearChildren(resultsEl);
+      if (!query || !cy) return;
+      const lower = query.toLowerCase();
+      const hits = cy.nodes().filter((node) => {
+        const data = node.data();
+        if (data.kind === "signal") return String(data.name).toLowerCase().includes(lower);
+        return (
+          String(data.instance_name).toLowerCase().includes(lower) ||
+          String(data.gate_id) === query
+        );
+      });
+      if (!hits.length) {
+        const empty = document.createElement("p");
+        empty.textContent = "No signal, instance, or gate ID matches.";
+        resultsEl.appendChild(empty);
+        return;
+      }
+      let exact = hits.filter((node) => {
+        const data = node.data();
+        return data.name === query || data.instance_name === query || String(data.gate_id) === query;
+      });
+      const chosen = exact.length ? exact[0] : hits[0];
+      hits.forEach((node) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = nodeLabel(node);
+        button.addEventListener("click", () => selectNode(node, true));
+        resultsEl.appendChild(button);
+      });
+      selectNode(chosen, true);
+    }
+
+    async function fetchSnapshot(url) {
+      const response = await fetch(url, { cache: "no-store" });
+      if (!response.ok) throw new Error("HTTP " + response.status + " for " + url);
+      return response.json();
+    }
+
+    async function reloadSnapshot() {
+      if (!snapshotUrl) {
+        setText(statusEl, "Reload uses the snapshot URL. Choose a JSON file, or start viewer/serve.py.");
+        return;
+      }
+      try {
+        loadGraph(await fetchSnapshot(snapshotUrl));
+      } catch (error) {
+        setText(statusEl, "Could not reload " + snapshotUrl + ". " + error.message);
+      }
+    }
+
+    function boot() {
+      if (typeof cytoscape === "undefined") {
+        document.getElementById("library-error").hidden = false;
+        document.getElementById("app").hidden = true;
+        return;
+      }
+      cy = cytoscape({
+        container: document.getElementById("cy"),
+        elements: [],
+        wheelSensitivity: 0.2,
+        minZoom: 0.02,
+        maxZoom: 4,
+        style: [
+          {
+            selector: "node",
+            style: {
+              "font-size": 10,
+              "text-wrap": "wrap",
+              "text-max-width": 74,
+              "text-valign": "center",
+              "text-halign": "center",
+              color: "#1c2833",
+              "border-width": 1,
+              "border-color": "#5d6d7e"
+            }
+          },
+          {
+            selector: 'node[kind = "signal"]',
+            style: {
+              label: (node) => node.data("name") + "\n" + node.data("value"),
+              shape: "ellipse",
+              width: 58,
+              height: 58,
+              "background-color": "#eef2f5"
+            }
+          },
+          {
+            selector: 'node[kind = "signal"].values-off',
+            style: { label: "data(name)" }
+          },
+          {
+            selector: 'node[kind = "gate"]',
+            style: {
+              label: (node) => node.data("instance_name") + "\n" + node.data("gate_type"),
+              shape: "round-rectangle",
+              width: 92,
+              height: 42,
+              "background-color": "#e5f2e1"
+            }
+          },
+          {
+            selector: 'node[kind = "signal"][?is_pi]',
+            style: { "border-width": 3, "border-color": "#1f6feb" }
+          },
+          {
+            selector: 'node[kind = "signal"][?is_po]',
+            style: { "border-width": 3, "border-color": "#1e8449" }
+          },
+          { selector: 'node[value = "0"]', style: { "background-color": "#dfe6e9" } },
+          { selector: 'node[value = "1"]', style: { "background-color": "#d6e6fb" } },
+          { selector: 'node[value = "D"]', style: { "background-color": "#f5c6cb" } },
+          { selector: 'node[value = "D\'"]', style: { "background-color": "#fdebd0" } },
+          {
+            selector: "edge",
+            style: {
+              width: 1.4,
+              "curve-style": "bezier",
+              "target-arrow-shape": "triangle",
+              "arrow-scale": 0.8,
+              "line-color": "#7f8c9b",
+              "target-arrow-color": "#7f8c9b",
+              "font-size": 9,
+              color: "#34495e"
+            }
+          },
+          { selector: "edge.show-label", style: { label: "data(pin_label)" } },
+          { selector: ".filtered-out", style: { display: "none" } },
+          {
+            selector: "node.fault-on",
+            style: { "border-width": 5, "border-color": "#c0392b", "border-style": "double" }
+          },
+          {
+            selector: "edge.fault-on",
+            style: { width: 4, "line-color": "#c0392b", "target-arrow-color": "#c0392b" }
+          },
+          {
+            selector: "node.frontier-on",
+            style: { "background-color": "#f9e79f", "border-color": "#b7950b", "border-width": 4 }
+          },
+          {
+            selector: ":selected",
+            style: { "overlay-color": "#1f6feb", "overlay-padding": 6, "overlay-opacity": 0.2 }
+          }
+        ]
+      });
+
+      cy.on("select", "node, edge", (event) => {
+        showDetails(event.target);
+        applyEdgeLabels();
+      });
+      cy.on("unselect", () => {
+        if (!cy.elements(":selected").length) showDetails(null);
+      });
+      cy.on("zoom", () => {
+        const next = cy.zoom() >= 1.4;
+        if (next !== labelsByZoom) {
+          labelsByZoom = next;
+          applyEdgeLabels();
+        }
+      });
+
+      document.getElementById("fit").addEventListener("click", () => {
+        cy.fit(cy.elements(":visible"), 30);
+      });
+      document.getElementById("neighborhood").addEventListener("click", showNeighborhood);
+      document.getElementById("full").addEventListener("click", showFull);
+      document.getElementById("search-btn").addEventListener("click", runSearch);
+      document.getElementById("search").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") runSearch();
+      });
+      ["show-gates", "show-signals"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", applyVisibility);
+      });
+      document.getElementById("show-labels").addEventListener("change", applyEdgeLabels);
+      ["show-fault", "show-frontier", "show-values"].forEach((id) => {
+        document.getElementById(id).addEventListener("change", applyOverlays);
+      });
+      document.getElementById("reload").addEventListener("click", reloadSnapshot);
+      document.getElementById("file").addEventListener("change", (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          try {
+            snapshotUrl = null;
+            loadGraph(JSON.parse(String(reader.result)));
+          } catch (error) {
+            setText(statusEl, "That file is not viewer JSON. " + error.message);
+          }
+        };
+        reader.readAsText(file);
+      });
+
+      reloadSnapshot();
+    }
+
+    boot();
+  </script>
+</body>
+</html>

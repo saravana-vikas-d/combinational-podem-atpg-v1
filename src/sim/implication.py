@@ -229,11 +229,19 @@ def _backtrace_xor(
         chosen_rail = other_rail if want_same else 1 - other_rail
         return [(chosen, _logic5_from_rail(chosen_rail))]
 
-    chosen_rail = 0
-    other_rail = chosen_rail if want_same else 1 - chosen_rail
+    # Other pin is X: input_index selects which XOR solution the search loop tries.
+    # Same rails (XOR out 0): index 0 -> (0,0), index 1 -> (1,1).
+    # Different rails (XOR out 1): index 0 -> (chosen=0, other=1),
+    # index 1 -> (chosen=0, other=1) on the swapped pins, i.e. (0,1) and (1,0).
+    if want_same:
+        bit = 0 if input_index == 0 else 1
+        return [
+            (chosen, _logic5_from_rail(bit)),
+            (other, _logic5_from_rail(bit)),
+        ]
     return [
-        (chosen, _logic5_from_rail(chosen_rail)),
-        (other, _logic5_from_rail(other_rail)),
+        (chosen, Logic5.ZERO),
+        (other, Logic5.ONE),
     ]
 
 

@@ -1,0 +1,260 @@
+// Verilog
+// c499
+// Ninputs 41
+// Noutputs 32
+// NtotalGates 202
+// XOR2 104
+// AND2 40
+// NOT1 40
+// AND4 8
+// OR4 2
+// AND5 8
+
+// Vivado copy: each ISCAS gate is a DONT_TOUCH LUT, not a Verilog primitive.
+// Verilog nand/nor/xnor become and/or/xor + not unless mapped to LUTs.
+// Add this file AND iscas_vivado_gates.v to the Vivado project.
+// synth_design -flatten_hierarchy none -no_lc -resource_sharing off
+
+(* DONT_TOUCH = "TRUE" *)
+module c499 (N1,N5,N9,N13,N17,N21,N25,N29,N33,N37,
+             N41,N45,N49,N53,N57,N61,N65,N69,N73,N77,
+             N81,N85,N89,N93,N97,N101,N105,N109,N113,N117,
+             N121,N125,N129,N130,N131,N132,N133,N134,N135,N136,
+             N137,N724,N725,N726,N727,N728,N729,N730,N731,N732,
+             N733,N734,N735,N736,N737,N738,N739,N740,N741,N742,
+             N743,N744,N745,N746,N747,N748,N749,N750,N751,N752,
+             N753,N754,N755);
+
+input N1,N5,N9,N13,N17,N21,N25,N29,N33,N37,
+      N41,N45,N49,N53,N57,N61,N65,N69,N73,N77,
+      N81,N85,N89,N93,N97,N101,N105,N109,N113,N117,
+      N121,N125,N129,N130,N131,N132,N133,N134,N135,N136,
+      N137;
+
+output N724,N725,N726,N727,N728,N729,N730,N731,N732,N733,
+       N734,N735,N736,N737,N738,N739,N740,N741,N742,N743,
+       N744,N745,N746,N747,N748,N749,N750,N751,N752,N753,
+       N754,N755;
+
+wire N250,N251,N252,N253,N254,N255,N256,N257,N258,N259,
+     N260,N261,N262,N263,N264,N265,N266,N267,N268,N269,
+     N270,N271,N272,N273,N274,N275,N276,N277,N278,N279,
+     N280,N281,N282,N283,N284,N285,N286,N287,N288,N289,
+     N290,N293,N296,N299,N302,N305,N308,N311,N314,N315,
+     N316,N317,N318,N319,N320,N321,N338,N339,N340,N341,
+     N342,N343,N344,N345,N346,N347,N348,N349,N350,N351,
+     N352,N353,N354,N367,N380,N393,N406,N419,N432,N445,
+     N554,N555,N556,N557,N558,N559,N560,N561,N562,N563,
+     N564,N565,N566,N567,N568,N569,N570,N571,N572,N573,
+     N574,N575,N576,N577,N578,N579,N580,N581,N582,N583,
+     N584,N585,N586,N587,N588,N589,N590,N591,N592,N593,
+     N594,N595,N596,N597,N598,N599,N600,N601,N602,N607,
+     N620,N625,N630,N635,N640,N645,N650,N655,N692,N693,
+     N694,N695,N696,N697,N698,N699,N700,N701,N702,N703,
+     N704,N705,N706,N707,N708,N709,N710,N711,N712,N713,
+     N714,N715,N716,N717,N718,N719,N720,N721,N722,N723;
+
+iscas_xor2 XOR2_1 (N250, N1, N5);
+iscas_xor2 XOR2_2 (N251, N9, N13);
+iscas_xor2 XOR2_3 (N252, N17, N21);
+iscas_xor2 XOR2_4 (N253, N25, N29);
+iscas_xor2 XOR2_5 (N254, N33, N37);
+iscas_xor2 XOR2_6 (N255, N41, N45);
+iscas_xor2 XOR2_7 (N256, N49, N53);
+iscas_xor2 XOR2_8 (N257, N57, N61);
+iscas_xor2 XOR2_9 (N258, N65, N69);
+iscas_xor2 XOR2_10 (N259, N73, N77);
+iscas_xor2 XOR2_11 (N260, N81, N85);
+iscas_xor2 XOR2_12 (N261, N89, N93);
+iscas_xor2 XOR2_13 (N262, N97, N101);
+iscas_xor2 XOR2_14 (N263, N105, N109);
+iscas_xor2 XOR2_15 (N264, N113, N117);
+iscas_xor2 XOR2_16 (N265, N121, N125);
+iscas_and2 AND2_17 (N266, N129, N137);
+iscas_and2 AND2_18 (N267, N130, N137);
+iscas_and2 AND2_19 (N268, N131, N137);
+iscas_and2 AND2_20 (N269, N132, N137);
+iscas_and2 AND2_21 (N270, N133, N137);
+iscas_and2 AND2_22 (N271, N134, N137);
+iscas_and2 AND2_23 (N272, N135, N137);
+iscas_and2 AND2_24 (N273, N136, N137);
+iscas_xor2 XOR2_25 (N274, N1, N17);
+iscas_xor2 XOR2_26 (N275, N33, N49);
+iscas_xor2 XOR2_27 (N276, N5, N21);
+iscas_xor2 XOR2_28 (N277, N37, N53);
+iscas_xor2 XOR2_29 (N278, N9, N25);
+iscas_xor2 XOR2_30 (N279, N41, N57);
+iscas_xor2 XOR2_31 (N280, N13, N29);
+iscas_xor2 XOR2_32 (N281, N45, N61);
+iscas_xor2 XOR2_33 (N282, N65, N81);
+iscas_xor2 XOR2_34 (N283, N97, N113);
+iscas_xor2 XOR2_35 (N284, N69, N85);
+iscas_xor2 XOR2_36 (N285, N101, N117);
+iscas_xor2 XOR2_37 (N286, N73, N89);
+iscas_xor2 XOR2_38 (N287, N105, N121);
+iscas_xor2 XOR2_39 (N288, N77, N93);
+iscas_xor2 XOR2_40 (N289, N109, N125);
+iscas_xor2 XOR2_41 (N290, N250, N251);
+iscas_xor2 XOR2_42 (N293, N252, N253);
+iscas_xor2 XOR2_43 (N296, N254, N255);
+iscas_xor2 XOR2_44 (N299, N256, N257);
+iscas_xor2 XOR2_45 (N302, N258, N259);
+iscas_xor2 XOR2_46 (N305, N260, N261);
+iscas_xor2 XOR2_47 (N308, N262, N263);
+iscas_xor2 XOR2_48 (N311, N264, N265);
+iscas_xor2 XOR2_49 (N314, N274, N275);
+iscas_xor2 XOR2_50 (N315, N276, N277);
+iscas_xor2 XOR2_51 (N316, N278, N279);
+iscas_xor2 XOR2_52 (N317, N280, N281);
+iscas_xor2 XOR2_53 (N318, N282, N283);
+iscas_xor2 XOR2_54 (N319, N284, N285);
+iscas_xor2 XOR2_55 (N320, N286, N287);
+iscas_xor2 XOR2_56 (N321, N288, N289);
+iscas_xor2 XOR2_57 (N338, N290, N293);
+iscas_xor2 XOR2_58 (N339, N296, N299);
+iscas_xor2 XOR2_59 (N340, N290, N296);
+iscas_xor2 XOR2_60 (N341, N293, N299);
+iscas_xor2 XOR2_61 (N342, N302, N305);
+iscas_xor2 XOR2_62 (N343, N308, N311);
+iscas_xor2 XOR2_63 (N344, N302, N308);
+iscas_xor2 XOR2_64 (N345, N305, N311);
+iscas_xor2 XOR2_65 (N346, N266, N342);
+iscas_xor2 XOR2_66 (N347, N267, N343);
+iscas_xor2 XOR2_67 (N348, N268, N344);
+iscas_xor2 XOR2_68 (N349, N269, N345);
+iscas_xor2 XOR2_69 (N350, N270, N338);
+iscas_xor2 XOR2_70 (N351, N271, N339);
+iscas_xor2 XOR2_71 (N352, N272, N340);
+iscas_xor2 XOR2_72 (N353, N273, N341);
+iscas_xor2 XOR2_73 (N354, N314, N346);
+iscas_xor2 XOR2_74 (N367, N315, N347);
+iscas_xor2 XOR2_75 (N380, N316, N348);
+iscas_xor2 XOR2_76 (N393, N317, N349);
+iscas_xor2 XOR2_77 (N406, N318, N350);
+iscas_xor2 XOR2_78 (N419, N319, N351);
+iscas_xor2 XOR2_79 (N432, N320, N352);
+iscas_xor2 XOR2_80 (N445, N321, N353);
+iscas_not1 NOT1_81 (N554, N354);
+iscas_not1 NOT1_82 (N555, N367);
+iscas_not1 NOT1_83 (N556, N380);
+iscas_not1 NOT1_84 (N557, N354);
+iscas_not1 NOT1_85 (N558, N367);
+iscas_not1 NOT1_86 (N559, N393);
+iscas_not1 NOT1_87 (N560, N354);
+iscas_not1 NOT1_88 (N561, N380);
+iscas_not1 NOT1_89 (N562, N393);
+iscas_not1 NOT1_90 (N563, N367);
+iscas_not1 NOT1_91 (N564, N380);
+iscas_not1 NOT1_92 (N565, N393);
+iscas_not1 NOT1_93 (N566, N419);
+iscas_not1 NOT1_94 (N567, N445);
+iscas_not1 NOT1_95 (N568, N419);
+iscas_not1 NOT1_96 (N569, N432);
+iscas_not1 NOT1_97 (N570, N406);
+iscas_not1 NOT1_98 (N571, N445);
+iscas_not1 NOT1_99 (N572, N406);
+iscas_not1 NOT1_100 (N573, N432);
+iscas_not1 NOT1_101 (N574, N406);
+iscas_not1 NOT1_102 (N575, N419);
+iscas_not1 NOT1_103 (N576, N432);
+iscas_not1 NOT1_104 (N577, N406);
+iscas_not1 NOT1_105 (N578, N419);
+iscas_not1 NOT1_106 (N579, N445);
+iscas_not1 NOT1_107 (N580, N406);
+iscas_not1 NOT1_108 (N581, N432);
+iscas_not1 NOT1_109 (N582, N445);
+iscas_not1 NOT1_110 (N583, N419);
+iscas_not1 NOT1_111 (N584, N432);
+iscas_not1 NOT1_112 (N585, N445);
+iscas_not1 NOT1_113 (N586, N367);
+iscas_not1 NOT1_114 (N587, N393);
+iscas_not1 NOT1_115 (N588, N367);
+iscas_not1 NOT1_116 (N589, N380);
+iscas_not1 NOT1_117 (N590, N354);
+iscas_not1 NOT1_118 (N591, N393);
+iscas_not1 NOT1_119 (N592, N354);
+iscas_not1 NOT1_120 (N593, N380);
+iscas_and4 AND4_121 (N594, N554, N555, N556, N393);
+iscas_and4 AND4_122 (N595, N557, N558, N380, N559);
+iscas_and4 AND4_123 (N596, N560, N367, N561, N562);
+iscas_and4 AND4_124 (N597, N354, N563, N564, N565);
+iscas_and4 AND4_125 (N598, N574, N575, N576, N445);
+iscas_and4 AND4_126 (N599, N577, N578, N432, N579);
+iscas_and4 AND4_127 (N600, N580, N419, N581, N582);
+iscas_and4 AND4_128 (N601, N406, N583, N584, N585);
+iscas_or4 OR4_129 (N602, N594, N595, N596, N597);
+iscas_or4 OR4_130 (N607, N598, N599, N600, N601);
+iscas_and5 AND5_131 (N620, N406, N566, N432, N567, N602);
+iscas_and5 AND5_132 (N625, N406, N568, N569, N445, N602);
+iscas_and5 AND5_133 (N630, N570, N419, N432, N571, N602);
+iscas_and5 AND5_134 (N635, N572, N419, N573, N445, N602);
+iscas_and5 AND5_135 (N640, N354, N586, N380, N587, N607);
+iscas_and5 AND5_136 (N645, N354, N588, N589, N393, N607);
+iscas_and5 AND5_137 (N650, N590, N367, N380, N591, N607);
+iscas_and5 AND5_138 (N655, N592, N367, N593, N393, N607);
+iscas_and2 AND2_139 (N692, N354, N620);
+iscas_and2 AND2_140 (N693, N367, N620);
+iscas_and2 AND2_141 (N694, N380, N620);
+iscas_and2 AND2_142 (N695, N393, N620);
+iscas_and2 AND2_143 (N696, N354, N625);
+iscas_and2 AND2_144 (N697, N367, N625);
+iscas_and2 AND2_145 (N698, N380, N625);
+iscas_and2 AND2_146 (N699, N393, N625);
+iscas_and2 AND2_147 (N700, N354, N630);
+iscas_and2 AND2_148 (N701, N367, N630);
+iscas_and2 AND2_149 (N702, N380, N630);
+iscas_and2 AND2_150 (N703, N393, N630);
+iscas_and2 AND2_151 (N704, N354, N635);
+iscas_and2 AND2_152 (N705, N367, N635);
+iscas_and2 AND2_153 (N706, N380, N635);
+iscas_and2 AND2_154 (N707, N393, N635);
+iscas_and2 AND2_155 (N708, N406, N640);
+iscas_and2 AND2_156 (N709, N419, N640);
+iscas_and2 AND2_157 (N710, N432, N640);
+iscas_and2 AND2_158 (N711, N445, N640);
+iscas_and2 AND2_159 (N712, N406, N645);
+iscas_and2 AND2_160 (N713, N419, N645);
+iscas_and2 AND2_161 (N714, N432, N645);
+iscas_and2 AND2_162 (N715, N445, N645);
+iscas_and2 AND2_163 (N716, N406, N650);
+iscas_and2 AND2_164 (N717, N419, N650);
+iscas_and2 AND2_165 (N718, N432, N650);
+iscas_and2 AND2_166 (N719, N445, N650);
+iscas_and2 AND2_167 (N720, N406, N655);
+iscas_and2 AND2_168 (N721, N419, N655);
+iscas_and2 AND2_169 (N722, N432, N655);
+iscas_and2 AND2_170 (N723, N445, N655);
+iscas_xor2 XOR2_171 (N724, N1, N692);
+iscas_xor2 XOR2_172 (N725, N5, N693);
+iscas_xor2 XOR2_173 (N726, N9, N694);
+iscas_xor2 XOR2_174 (N727, N13, N695);
+iscas_xor2 XOR2_175 (N728, N17, N696);
+iscas_xor2 XOR2_176 (N729, N21, N697);
+iscas_xor2 XOR2_177 (N730, N25, N698);
+iscas_xor2 XOR2_178 (N731, N29, N699);
+iscas_xor2 XOR2_179 (N732, N33, N700);
+iscas_xor2 XOR2_180 (N733, N37, N701);
+iscas_xor2 XOR2_181 (N734, N41, N702);
+iscas_xor2 XOR2_182 (N735, N45, N703);
+iscas_xor2 XOR2_183 (N736, N49, N704);
+iscas_xor2 XOR2_184 (N737, N53, N705);
+iscas_xor2 XOR2_185 (N738, N57, N706);
+iscas_xor2 XOR2_186 (N739, N61, N707);
+iscas_xor2 XOR2_187 (N740, N65, N708);
+iscas_xor2 XOR2_188 (N741, N69, N709);
+iscas_xor2 XOR2_189 (N742, N73, N710);
+iscas_xor2 XOR2_190 (N743, N77, N711);
+iscas_xor2 XOR2_191 (N744, N81, N712);
+iscas_xor2 XOR2_192 (N745, N85, N713);
+iscas_xor2 XOR2_193 (N746, N89, N714);
+iscas_xor2 XOR2_194 (N747, N93, N715);
+iscas_xor2 XOR2_195 (N748, N97, N716);
+iscas_xor2 XOR2_196 (N749, N101, N717);
+iscas_xor2 XOR2_197 (N750, N105, N718);
+iscas_xor2 XOR2_198 (N751, N109, N719);
+iscas_xor2 XOR2_199 (N752, N113, N720);
+iscas_xor2 XOR2_200 (N753, N117, N721);
+iscas_xor2 XOR2_201 (N754, N121, N722);
+iscas_xor2 XOR2_202 (N755, N125, N723);
+
+endmodule

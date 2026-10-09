@@ -1,0 +1,212 @@
+// Verilog
+// c432
+// Ninputs 36
+// Noutputs 7
+// NtotalGates 160
+// NOT1 40
+// NAND2 64
+// NOR2 19
+// AND9 3
+// XOR2 18
+// NAND4 14
+// AND8 1
+// NAND3 1
+
+// Vivado copy: each ISCAS gate is a DONT_TOUCH LUT, not a Verilog primitive.
+// Verilog nand/nor/xnor become and/or/xor + not unless mapped to LUTs.
+// Add this file AND iscas_vivado_gates.v to the Vivado project.
+// synth_design -flatten_hierarchy none -no_lc -resource_sharing off
+
+(* DONT_TOUCH = "TRUE" *)
+module c432 (N1,N4,N8,N11,N14,N17,N21,N24,N27,N30,
+             N34,N37,N40,N43,N47,N50,N53,N56,N60,N63,
+             N66,N69,N73,N76,N79,N82,N86,N89,N92,N95,
+             N99,N102,N105,N108,N112,N115,N223,N329,N370,N421,
+             N430,N431,N432);
+
+input N1,N4,N8,N11,N14,N17,N21,N24,N27,N30,
+      N34,N37,N40,N43,N47,N50,N53,N56,N60,N63,
+      N66,N69,N73,N76,N79,N82,N86,N89,N92,N95,
+      N99,N102,N105,N108,N112,N115;
+
+output N223,N329,N370,N421,N430,N431,N432;
+
+wire N118,N119,N122,N123,N126,N127,N130,N131,N134,N135,
+     N138,N139,N142,N143,N146,N147,N150,N151,N154,N157,
+     N158,N159,N162,N165,N168,N171,N174,N177,N180,N183,
+     N184,N185,N186,N187,N188,N189,N190,N191,N192,N193,
+     N194,N195,N196,N197,N198,N199,N203,N213,N224,N227,
+     N230,N233,N236,N239,N242,N243,N246,N247,N250,N251,
+     N254,N255,N256,N257,N258,N259,N260,N263,N264,N267,
+     N270,N273,N276,N279,N282,N285,N288,N289,N290,N291,
+     N292,N293,N294,N295,N296,N300,N301,N302,N303,N304,
+     N305,N306,N307,N308,N309,N319,N330,N331,N332,N333,
+     N334,N335,N336,N337,N338,N339,N340,N341,N342,N343,
+     N344,N345,N346,N347,N348,N349,N350,N351,N352,N353,
+     N354,N355,N356,N357,N360,N371,N372,N373,N374,N375,
+     N376,N377,N378,N379,N380,N381,N386,N393,N399,N404,
+     N407,N411,N414,N415,N416,N417,N418,N419,N420,N422,
+     N425,N428,N429;
+
+iscas_not1 NOT1_1 (N118, N1);
+iscas_not1 NOT1_2 (N119, N4);
+iscas_not1 NOT1_3 (N122, N11);
+iscas_not1 NOT1_4 (N123, N17);
+iscas_not1 NOT1_5 (N126, N24);
+iscas_not1 NOT1_6 (N127, N30);
+iscas_not1 NOT1_7 (N130, N37);
+iscas_not1 NOT1_8 (N131, N43);
+iscas_not1 NOT1_9 (N134, N50);
+iscas_not1 NOT1_10 (N135, N56);
+iscas_not1 NOT1_11 (N138, N63);
+iscas_not1 NOT1_12 (N139, N69);
+iscas_not1 NOT1_13 (N142, N76);
+iscas_not1 NOT1_14 (N143, N82);
+iscas_not1 NOT1_15 (N146, N89);
+iscas_not1 NOT1_16 (N147, N95);
+iscas_not1 NOT1_17 (N150, N102);
+iscas_not1 NOT1_18 (N151, N108);
+iscas_nand2 NAND2_19 (N154, N118, N4);
+iscas_nor2 NOR2_20 (N157, N8, N119);
+iscas_nor2 NOR2_21 (N158, N14, N119);
+iscas_nand2 NAND2_22 (N159, N122, N17);
+iscas_nand2 NAND2_23 (N162, N126, N30);
+iscas_nand2 NAND2_24 (N165, N130, N43);
+iscas_nand2 NAND2_25 (N168, N134, N56);
+iscas_nand2 NAND2_26 (N171, N138, N69);
+iscas_nand2 NAND2_27 (N174, N142, N82);
+iscas_nand2 NAND2_28 (N177, N146, N95);
+iscas_nand2 NAND2_29 (N180, N150, N108);
+iscas_nor2 NOR2_30 (N183, N21, N123);
+iscas_nor2 NOR2_31 (N184, N27, N123);
+iscas_nor2 NOR2_32 (N185, N34, N127);
+iscas_nor2 NOR2_33 (N186, N40, N127);
+iscas_nor2 NOR2_34 (N187, N47, N131);
+iscas_nor2 NOR2_35 (N188, N53, N131);
+iscas_nor2 NOR2_36 (N189, N60, N135);
+iscas_nor2 NOR2_37 (N190, N66, N135);
+iscas_nor2 NOR2_38 (N191, N73, N139);
+iscas_nor2 NOR2_39 (N192, N79, N139);
+iscas_nor2 NOR2_40 (N193, N86, N143);
+iscas_nor2 NOR2_41 (N194, N92, N143);
+iscas_nor2 NOR2_42 (N195, N99, N147);
+iscas_nor2 NOR2_43 (N196, N105, N147);
+iscas_nor2 NOR2_44 (N197, N112, N151);
+iscas_nor2 NOR2_45 (N198, N115, N151);
+iscas_and9 AND9_46 (N199, N154, N159, N162, N165, N168, N171, N174, N177, N180);
+iscas_not1 NOT1_47 (N203, N199);
+iscas_not1 NOT1_48 (N213, N199);
+iscas_not1 NOT1_49 (N223, N199);
+iscas_xor2 XOR2_50 (N224, N203, N154);
+iscas_xor2 XOR2_51 (N227, N203, N159);
+iscas_xor2 XOR2_52 (N230, N203, N162);
+iscas_xor2 XOR2_53 (N233, N203, N165);
+iscas_xor2 XOR2_54 (N236, N203, N168);
+iscas_xor2 XOR2_55 (N239, N203, N171);
+iscas_nand2 NAND2_56 (N242, N1, N213);
+iscas_xor2 XOR2_57 (N243, N203, N174);
+iscas_nand2 NAND2_58 (N246, N213, N11);
+iscas_xor2 XOR2_59 (N247, N203, N177);
+iscas_nand2 NAND2_60 (N250, N213, N24);
+iscas_xor2 XOR2_61 (N251, N203, N180);
+iscas_nand2 NAND2_62 (N254, N213, N37);
+iscas_nand2 NAND2_63 (N255, N213, N50);
+iscas_nand2 NAND2_64 (N256, N213, N63);
+iscas_nand2 NAND2_65 (N257, N213, N76);
+iscas_nand2 NAND2_66 (N258, N213, N89);
+iscas_nand2 NAND2_67 (N259, N213, N102);
+iscas_nand2 NAND2_68 (N260, N224, N157);
+iscas_nand2 NAND2_69 (N263, N224, N158);
+iscas_nand2 NAND2_70 (N264, N227, N183);
+iscas_nand2 NAND2_71 (N267, N230, N185);
+iscas_nand2 NAND2_72 (N270, N233, N187);
+iscas_nand2 NAND2_73 (N273, N236, N189);
+iscas_nand2 NAND2_74 (N276, N239, N191);
+iscas_nand2 NAND2_75 (N279, N243, N193);
+iscas_nand2 NAND2_76 (N282, N247, N195);
+iscas_nand2 NAND2_77 (N285, N251, N197);
+iscas_nand2 NAND2_78 (N288, N227, N184);
+iscas_nand2 NAND2_79 (N289, N230, N186);
+iscas_nand2 NAND2_80 (N290, N233, N188);
+iscas_nand2 NAND2_81 (N291, N236, N190);
+iscas_nand2 NAND2_82 (N292, N239, N192);
+iscas_nand2 NAND2_83 (N293, N243, N194);
+iscas_nand2 NAND2_84 (N294, N247, N196);
+iscas_nand2 NAND2_85 (N295, N251, N198);
+iscas_and9 AND9_86 (N296, N260, N264, N267, N270, N273, N276, N279, N282, N285);
+iscas_not1 NOT1_87 (N300, N263);
+iscas_not1 NOT1_88 (N301, N288);
+iscas_not1 NOT1_89 (N302, N289);
+iscas_not1 NOT1_90 (N303, N290);
+iscas_not1 NOT1_91 (N304, N291);
+iscas_not1 NOT1_92 (N305, N292);
+iscas_not1 NOT1_93 (N306, N293);
+iscas_not1 NOT1_94 (N307, N294);
+iscas_not1 NOT1_95 (N308, N295);
+iscas_not1 NOT1_96 (N309, N296);
+iscas_not1 NOT1_97 (N319, N296);
+iscas_not1 NOT1_98 (N329, N296);
+iscas_xor2 XOR2_99 (N330, N309, N260);
+iscas_xor2 XOR2_100 (N331, N309, N264);
+iscas_xor2 XOR2_101 (N332, N309, N267);
+iscas_xor2 XOR2_102 (N333, N309, N270);
+iscas_nand2 NAND2_103 (N334, N8, N319);
+iscas_xor2 XOR2_104 (N335, N309, N273);
+iscas_nand2 NAND2_105 (N336, N319, N21);
+iscas_xor2 XOR2_106 (N337, N309, N276);
+iscas_nand2 NAND2_107 (N338, N319, N34);
+iscas_xor2 XOR2_108 (N339, N309, N279);
+iscas_nand2 NAND2_109 (N340, N319, N47);
+iscas_xor2 XOR2_110 (N341, N309, N282);
+iscas_nand2 NAND2_111 (N342, N319, N60);
+iscas_xor2 XOR2_112 (N343, N309, N285);
+iscas_nand2 NAND2_113 (N344, N319, N73);
+iscas_nand2 NAND2_114 (N345, N319, N86);
+iscas_nand2 NAND2_115 (N346, N319, N99);
+iscas_nand2 NAND2_116 (N347, N319, N112);
+iscas_nand2 NAND2_117 (N348, N330, N300);
+iscas_nand2 NAND2_118 (N349, N331, N301);
+iscas_nand2 NAND2_119 (N350, N332, N302);
+iscas_nand2 NAND2_120 (N351, N333, N303);
+iscas_nand2 NAND2_121 (N352, N335, N304);
+iscas_nand2 NAND2_122 (N353, N337, N305);
+iscas_nand2 NAND2_123 (N354, N339, N306);
+iscas_nand2 NAND2_124 (N355, N341, N307);
+iscas_nand2 NAND2_125 (N356, N343, N308);
+iscas_and9 AND9_126 (N357, N348, N349, N350, N351, N352, N353, N354, N355, N356);
+iscas_not1 NOT1_127 (N360, N357);
+iscas_not1 NOT1_128 (N370, N357);
+iscas_nand2 NAND2_129 (N371, N14, N360);
+iscas_nand2 NAND2_130 (N372, N360, N27);
+iscas_nand2 NAND2_131 (N373, N360, N40);
+iscas_nand2 NAND2_132 (N374, N360, N53);
+iscas_nand2 NAND2_133 (N375, N360, N66);
+iscas_nand2 NAND2_134 (N376, N360, N79);
+iscas_nand2 NAND2_135 (N377, N360, N92);
+iscas_nand2 NAND2_136 (N378, N360, N105);
+iscas_nand2 NAND2_137 (N379, N360, N115);
+iscas_nand4 NAND4_138 (N380, N4, N242, N334, N371);
+iscas_nand4 NAND4_139 (N381, N246, N336, N372, N17);
+iscas_nand4 NAND4_140 (N386, N250, N338, N373, N30);
+iscas_nand4 NAND4_141 (N393, N254, N340, N374, N43);
+iscas_nand4 NAND4_142 (N399, N255, N342, N375, N56);
+iscas_nand4 NAND4_143 (N404, N256, N344, N376, N69);
+iscas_nand4 NAND4_144 (N407, N257, N345, N377, N82);
+iscas_nand4 NAND4_145 (N411, N258, N346, N378, N95);
+iscas_nand4 NAND4_146 (N414, N259, N347, N379, N108);
+iscas_not1 NOT1_147 (N415, N380);
+iscas_and8 AND8_148 (N416, N381, N386, N393, N399, N404, N407, N411, N414);
+iscas_not1 NOT1_149 (N417, N393);
+iscas_not1 NOT1_150 (N418, N404);
+iscas_not1 NOT1_151 (N419, N407);
+iscas_not1 NOT1_152 (N420, N411);
+iscas_nor2 NOR2_153 (N421, N415, N416);
+iscas_nand2 NAND2_154 (N422, N386, N417);
+iscas_nand4 NAND4_155 (N425, N386, N393, N418, N399);
+iscas_nand3 NAND3_156 (N428, N399, N393, N419);
+iscas_nand4 NAND4_157 (N429, N386, N393, N407, N420);
+iscas_nand4 NAND4_158 (N430, N381, N386, N422, N399);
+iscas_nand4 NAND4_159 (N431, N381, N386, N425, N428);
+iscas_nand4 NAND4_160 (N432, N381, N422, N425, N429);
+
+endmodule

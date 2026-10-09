@@ -100,15 +100,24 @@ def test_backtrace_xor_with_d_on_other_input():
 
 def test_backtrace_xor_with_unknown_other_input_assigns_both():
     gate = _two_input_gate(GateType.XOR)
+    a, b = gate.inputs
 
-    assert backtrace(gate, Logic5.ZERO, 0) == [
-        (gate.inputs[0], Logic5.ZERO),
-        (gate.inputs[1], Logic5.ZERO),
-    ]
-    assert backtrace(gate, Logic5.ONE, 1) == [
-        (gate.inputs[1], Logic5.ZERO),
-        (gate.inputs[0], Logic5.ONE),
-    ]
+    assert backtrace(gate, Logic5.ZERO, 0) == [(a, Logic5.ZERO), (b, Logic5.ZERO)]
+    assert backtrace(gate, Logic5.ZERO, 1) == [(b, Logic5.ONE), (a, Logic5.ONE)]
+    assert backtrace(gate, Logic5.ONE, 0) == [(a, Logic5.ZERO), (b, Logic5.ONE)]
+    assert backtrace(gate, Logic5.ONE, 1) == [(b, Logic5.ZERO), (a, Logic5.ONE)]
+
+
+def test_backtrace_xnor_unknown_other_tries_both_same_polarities():
+    gate = _two_input_gate(GateType.XNOR)
+    a, b = gate.inputs
+
+    # XNOR out 1 <=> XOR out 0: same rails (0,0) and (1,1).
+    assert backtrace(gate, Logic5.ONE, 0) == [(a, Logic5.ZERO), (b, Logic5.ZERO)]
+    assert backtrace(gate, Logic5.ONE, 1) == [(b, Logic5.ONE), (a, Logic5.ONE)]
+    # XNOR out 0 <=> XOR out 1: (0,1) and (1,0).
+    assert backtrace(gate, Logic5.ZERO, 0) == [(a, Logic5.ZERO), (b, Logic5.ONE)]
+    assert backtrace(gate, Logic5.ZERO, 1) == [(b, Logic5.ZERO), (a, Logic5.ONE)]
 
 
 def test_backtrace_xnor_inverts_xor_desired():

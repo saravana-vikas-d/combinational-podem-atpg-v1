@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import product
 
 from circuit.circuit import Circuit, Gate, GateType, Signal
 from fault.fault import Fault
@@ -69,9 +70,16 @@ def _non_controlling_side_value(gate_type: GateType) -> Logic5:
             return Logic5.ZERO
         case GateType.XOR | GateType.XNOR:
             raise ValueError(
-                f"D-frontier propagation for {gate_type.name} is not implemented in v1"
+                f"{gate_type.name} has no single non-controlling value; "
+                "use both 0 and 1 side-input branches"
             )
     raise AssertionError(f"unhandled gate type: {gate_type}")
+
+
+def _side_input_objective(signal: Signal, desired: Logic5) -> Objective:
+    if signal.is_pi or signal.driver is None:
+        return Objective(signal=signal, desired=desired, gate=None)
+    return Objective(signal=signal, desired=desired, gate=signal.driver)
 
 
 def d_frontier_propagation_branches(
@@ -92,11 +100,10 @@ def d_frontier_propagation_branches(
     ):
         return []
 
-    try:
-        side_value = _non_controlling_side_value(gate.type)
-    except ValueError:
-        return []
+    if gate.type in (GateType.XOR, GateType.XNOR):
+        return _xor_xnor_propagation_branches(gate, fault)
 
+    side_value = _non_controlling_side_value(gate.type)
     objectives: list[Objective] = []
     side_notes: list[str] = []
 
@@ -112,28 +119,58 @@ def d_frontier_propagation_branches(
             continue
 
         side_notes.append(f"{input_signal.name}={side_value.display}")
-        if input_signal.is_pi:
-            objectives.append(
-                Objective(signal=input_signal, desired=side_value, gate=None)
-            )
-        elif input_signal.driver is not None:
-            objectives.append(
-                Objective(
-                    signal=input_signal,
-                    desired=side_value,
-                    gate=input_signal.driver,
-                )
-            )
-        else:
-            objectives.append(
-                Objective(signal=input_signal, desired=side_value, gate=None)
-            )
+        objectives.append(_side_input_objective(input_signal, side_value))
 
     branch_note = (
         f"propagation {gate.instance_name} "
         f"side_inputs={','.join(side_notes) if side_notes else 'none'}"
     )
     return [(branch_note, objectives)]
+
+
+def _xor_xnor_propagation_branches(
+    gate: Gate,
+    fault: Fault,
+) -> list[tuple[str, list[Objective]]]:
+    """D/D' propagates through XOR/XNOR for either 0 or 1 on every other input."""
+    x_pins: list[Signal] = []
+
+    for index, input_signal in enumerate(gate.inputs):
+        effective = resolve_input_value(input_signal, gate, index, fault)
+        if _is_d_effective(effective):
+            continue
+        current = input_signal.value
+        if current is Logic5.X:
+            x_pins.append(input_signal)
+            continue
+        if current not in (Logic5.ZERO, Logic5.ONE):
+            return []
+
+    if not x_pins:
+        return [
+            (
+                f"propagation {gate.instance_name} side_inputs=none",
+                [],
+            )
+        ]
+
+    branches: list[tuple[str, list[Objective]]] = []
+    for polarities in product((Logic5.ZERO, Logic5.ONE), repeat=len(x_pins)):
+        objectives = [
+            _side_input_objective(signal, value)
+            for signal, value in zip(x_pins, polarities, strict=True)
+        ]
+        side_notes = ",".join(
+            f"{signal.name}={value.display}"
+            for signal, value in zip(x_pins, polarities, strict=True)
+        )
+        branches.append(
+            (
+                f"propagation {gate.instance_name} side_inputs={side_notes}",
+                objectives,
+            )
+        )
+    return branches
 
 
 def upstream_objectives(

@@ -78,6 +78,44 @@ def test_podem_finds_test_for_c17_n3_sa0():
     assert fault_detected_at_po(verify) is True
 
 
+def _xor_po_circuit() -> Circuit:
+    a = Signal("a", is_pi=True)
+    b = Signal("b", is_pi=True)
+    z = Signal("z", is_po=True)
+    gate = Gate(id=0, instance_name="XOR1", type=GateType.XOR, inputs=[a, b], output=z)
+    z.driver = gate
+    a.fanouts.append((gate, 0))
+    b.fanouts.append((gate, 1))
+    circuit = Circuit(
+        name="xor_po",
+        signals={"a": a, "b": b, "z": z},
+        gates=[gate],
+        primary_inputs=[a, b],
+        primary_outputs=[z],
+    )
+    levelize(circuit)
+    return circuit
+
+
+def test_podem_finds_test_for_xor_input_sa0():
+    """XOR D-frontier must try both side polarities; either 0 or 1 on b propagates D."""
+    circuit = _xor_po_circuit()
+    fault = line_fault("a", 0)
+
+    result = podem(circuit, fault)
+
+    assert result.status == "success"
+    assert result.pattern is not None
+    assert result.pattern[0] == 1  # a = D for sa0
+
+    verify = _xor_po_circuit()
+    reset_values(verify)
+    _apply_pattern(verify, result.pattern)
+    inject_fault(verify, fault)
+    assert forward_imply(verify, active_fault=fault) is True
+    assert fault_detected_at_po(verify) is True
+
+
 def test_podem_finds_test_for_not_output_sa0_after_activation_backtrace():
     """Output stem sa0: activation justifies PI, then implication observes D at PO."""
     circuit = _not_output_fault_circuit()
@@ -88,11 +126,58 @@ def test_podem_finds_test_for_not_output_sa0_after_activation_backtrace():
     assert result.pattern == (0,)
 
 
+def test_podem_second_xor_polarity_propagates_through_and():
+    a = Signal("a", is_pi=True)
+    b = Signal("b", is_pi=True)
+    t = Signal("t")
+    z = Signal("z", is_po=True)
+    xor_gate = Gate(id=0, instance_name="XOR1", type=GateType.XOR, inputs=[a, b], output=t)
+    and_gate = Gate(id=1, instance_name="AND1", type=GateType.AND, inputs=[t, b], output=z)
+    t.driver = xor_gate
+    z.driver = and_gate
+    a.fanouts.append((xor_gate, 0))
+    b.fanouts.extend([(xor_gate, 1), (and_gate, 1)])
+    t.fanouts.append((and_gate, 0))
+    circuit = Circuit(
+        name="xor_and",
+        signals={"a": a, "b": b, "t": t, "z": z},
+        gates=[xor_gate, and_gate],
+        primary_inputs=[a, b],
+        primary_outputs=[z],
+    )
+    levelize(circuit)
+    fault = line_fault("a", 0)
+
+    result = podem(circuit, fault)
+
+    assert result.status == "success"
+    assert result.pattern is not None
+    assert result.pattern[1] == 1  # b must be 1; b=0 blocks the AND
+
+
 def test_podem_aborted_when_backtrack_limit_reached():
-    circuit = parse_iscas_verilog(ISCAS / "c17.v")
+    """First XOR polarity (b=0) kills the AND path; limit 0 aborts on that backtrack."""
+    a = Signal("a", is_pi=True)
+    b = Signal("b", is_pi=True)
+    t = Signal("t")
+    z = Signal("z", is_po=True)
+    xor_gate = Gate(id=0, instance_name="XOR1", type=GateType.XOR, inputs=[a, b], output=t)
+    and_gate = Gate(id=1, instance_name="AND1", type=GateType.AND, inputs=[t, b], output=z)
+    t.driver = xor_gate
+    z.driver = and_gate
+    a.fanouts.append((xor_gate, 0))
+    b.fanouts.extend([(xor_gate, 1), (and_gate, 1)])
+    t.fanouts.append((and_gate, 0))
+    circuit = Circuit(
+        name="xor_and",
+        signals={"a": a, "b": b, "t": t, "z": z},
+        gates=[xor_gate, and_gate],
+        primary_inputs=[a, b],
+        primary_outputs=[z],
+    )
     levelize(circuit)
 
-    result = podem(circuit, line_fault("N3", 0), backtrack_limit=0)
+    result = podem(circuit, line_fault("a", 0), backtrack_limit=0)
 
     assert result.status == "aborted"
     assert result.pattern is None
