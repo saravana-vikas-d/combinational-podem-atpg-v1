@@ -386,6 +386,13 @@ def _objective_search(
     after_activation: bool = False,
     stack_recorder: DecisionStackRecorder | None = None,
 ) -> Pattern | None:
+    if stack_recorder is not None:
+        stack_recorder.note_objective_step(
+            depth=depth,
+            backtracks=state.backtracks,
+            queue=queue,
+        )
+
     if recursion_limit is not None and depth >= recursion_limit:
         state.aborted = True
         state.abort_kind = "recursion_depth_limit"

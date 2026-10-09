@@ -15,14 +15,6 @@ _LINE = "=" * 80
 _SUBLINE = "-" * 80
 
 
-def _signal_role(signal: Signal) -> str:
-    if signal.is_pi:
-        return "PI"
-    if signal.is_po:
-        return "PO"
-    return "W"
-
-
 def _format_level(level: int) -> str:
     if level < 0:
         return "L-"
@@ -33,12 +25,6 @@ def _format_driver(signal: Signal) -> str:
     if signal.driver is None:
         return "-"
     return signal.driver.instance_name
-
-
-def _format_fanouts(signal: Signal) -> str:
-    if not signal.fanouts:
-        return "-"
-    return ", ".join(f"{gate.instance_name}[{index}]" for gate, index in signal.fanouts)
 
 
 def _gate_type_summary(circuit: Circuit) -> str:
@@ -96,23 +82,63 @@ def _write_gates(out: StringIO, circuit: Circuit) -> None:
     out.write("\n")
 
 
+def _signals_in_debug_order(circuit: Circuit) -> list[tuple[str, Signal]]:
+    """PI, internal wires, then PO, each in declaration order."""
+    primary_inputs = {signal.name for signal in circuit.primary_inputs}
+    primary_outputs = {signal.name for signal in circuit.primary_outputs}
+    wires = [
+        signal
+        for signal in circuit.signals.values()
+        if signal.name not in primary_inputs and signal.name not in primary_outputs
+    ]
+    ordered: list[tuple[str, Signal]] = []
+    ordered.extend(("PI", signal) for signal in circuit.primary_inputs)
+    ordered.extend(("W", signal) for signal in wires)
+    ordered.extend(("PO", signal) for signal in circuit.primary_outputs)
+    return ordered
+
+
+def _write_signal_record(out: StringIO, role: str, signal: Signal) -> None:
+    driver = signal.driver
+    if driver is None:
+        driver_text = "-"
+    else:
+        driver_text = f"{driver.instance_name} ({driver.type.name.lower()})"
+
+    out.write(
+        f"{role:<3} {signal.name}  {_format_level(signal.level)}  "
+        f"value={signal.value.display}  driver={driver_text}\n"
+    )
+    if not signal.fanouts:
+        out.write("    fanouts: (none)\n")
+        return
+
+    out.write(f"    fanouts ({len(signal.fanouts)}):\n")
+    for gate, index in signal.fanouts:
+        out.write(
+            f"      {gate.instance_name}[{index}]  "
+            f"{gate.type.name.lower()} -> {gate.output.name}\n"
+        )
+
+
 def _write_signals(out: StringIO, circuit: Circuit) -> None:
     out.write("SIGNALS\n")
     out.write(f"{_SUBLINE}\n")
+    out.write(
+        "Each signal: role, name, level, value, driver. "
+        "Fanouts list gate[input_index], gate type, and that gate's output net.\n\n"
+    )
 
     current_role: str | None = None
-    for signal in circuit.signals.values():
-        role = _signal_role(signal)
+    for role, signal in _signals_in_debug_order(circuit):
         if role != current_role:
             if current_role is not None:
                 out.write("\n")
             current_role = role
-
-        out.write(
-            f"{role:<3} {signal.name:<8} {_format_level(signal.level):<3} "
-            f"driver={_format_driver(signal):<12} fanouts={_format_fanouts(signal)}\n"
-        )
-    out.write("\n")
+            title = {"PI": "PRIMARY INPUTS", "W": "INTERNAL WIRES", "PO": "PRIMARY OUTPUTS"}[role]
+            out.write(f"{title}\n")
+        _write_signal_record(out, role, signal)
+        out.write("\n")
 
 
 def _write_levels(out: StringIO, circuit: Circuit) -> None:

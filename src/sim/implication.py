@@ -73,6 +73,10 @@ def _try_assign(signal: Signal, value: Logic5) -> bool:
     if signal.value is value:
         return True
     if _assign_compatible(signal.value, value):
+        # A computed D/D' is the same good-circuit bit plus the fault effect.
+        # Keep it when the wire currently holds only the plain 0 or 1.
+        if value in (Logic5.D, Logic5.DBAR) and signal.value not in (Logic5.D, Logic5.DBAR):
+            signal.value = value
         return True
     return False
 

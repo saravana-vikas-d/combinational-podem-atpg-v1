@@ -22,9 +22,14 @@ def test_format_circuit_c17_contains_expected_sections():
     assert "Gate types      : NAND=6" in text
     assert "Level groups    : 3 groups, max gate level 3" in text
     assert "[0] NAND2_1      L1  nand N10  <=  N1, N3" in text
-    assert "PI  N3       L0  driver=-            fanouts=NAND2_1[1], NAND2_2[0]" in text
-    assert "PO  N22      L3  driver=NAND2_5      fanouts=-" in text
-    assert "W   N11      L1  driver=NAND2_2      fanouts=NAND2_3[1], NAND2_4[0]" in text
+    assert "PI  N3  L0  value=X  driver=-" in text
+    assert "      NAND2_1[1]  nand -> N10" in text
+    assert "      NAND2_2[0]  nand -> N11" in text
+    assert "PO  N22  L3  value=X  driver=NAND2_5 (nand)" in text
+    assert "    fanouts: (none)" in text
+    assert "W   N11  L1  value=X  driver=NAND2_2 (nand)" in text
+    assert "      NAND2_3[1]  nand -> N16" in text
+    assert "      NAND2_4[0]  nand -> N19" in text
     assert "LEVELS\n  tier 0 (L1): NAND2_1(L1), NAND2_2(L1)" in text
     assert "  tier 2 (L3): NAND2_5(L3), NAND2_6(L3)" in text
 
