@@ -28,6 +28,13 @@ def format_podem_batch(circuit: Circuit, batch: PodemBatchResult) -> str:
     out.write(f"{_LINE}\n")
     out.write(f"Primary inputs (pattern bit order): {', '.join(pi_names)}\n")
     out.write(f"Patterns generated : {len(batch.patterns)}\n")
+    out.write(f"Raw faults         : {batch.raw_fault_count}\n")
+    out.write(
+        f"After collapse     : {batch.collapsed_representatives} representatives\n"
+    )
+    out.write(
+        f"Collapse reduction : {batch.collapse_reduction_percent:.2f}%\n"
+    )
     out.write(f"Total fault sites  : {batch.total_faults}\n")
     out.write(f"Faults covered     : {len(batch.covered)}\n")
     out.write(f"Fault coverage     : {batch.coverage_percent:.2f}%\n")

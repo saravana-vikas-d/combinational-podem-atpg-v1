@@ -26,6 +26,9 @@ def test_print_podem_from_file_writes_c17_patterns(tmp_path):
 
     report_text = report_path.read_text(encoding="utf-8")
     assert "Primary inputs (pattern bit order): N1, N2, N3, N6, N7" in report_text
+    assert "Raw faults         : 34\n" in report_text
+    assert "After collapse     : 16 representatives\n" in report_text
+    assert "Collapse reduction : 52.94%\n" in report_text
 
 
 def test_format_test_patterns_tp_empty():

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,12 @@ ISCAS_DIR = _ROOT / "ISCAS85_Circuits"
 OUTPUT_DIR = _ROOT / "Pattern_prints"
 RECURSION_LIMIT = 200
 BACKTRACK_LIMIT = 10000
+# Toy / invalid netlists excluded from the full ISCAS'85 batch.
+SKIP_CIRCUITS = frozenset({"ex1"})
+_GATE_LINE_RE = re.compile(
+    r"^\s*(and|or|nand|nor|not|buf|xor|xnor)\s+\w+\s*\(",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,6 +36,9 @@ class CircuitCoverageRow:
     untestable: int
     aborted: int
     backtracks: int
+    raw_faults: int
+    collapsed_reps: int
+    collapse_reduction_percent: float
 
 
 def _row_from_batch(circuit_name: str, batch) -> CircuitCoverageRow:
@@ -41,6 +51,9 @@ def _row_from_batch(circuit_name: str, batch) -> CircuitCoverageRow:
         untestable=len(batch.untestable),
         aborted=len(batch.aborted),
         backtracks=batch.total_backtracks,
+        raw_faults=batch.raw_fault_count,
+        collapsed_reps=batch.collapsed_representatives,
+        collapse_reduction_percent=batch.collapse_reduction_percent,
     )
 
 
@@ -60,6 +73,9 @@ def _format_coverage_table(rows: list[CircuitCoverageRow]) -> str:
     out = io.StringIO()
     headers = (
         "Circuit",
+        "Raw",
+        "Reps",
+        "Coll%",
         "Total",
         "Covered",
         "Coverage",
@@ -69,19 +85,21 @@ def _format_coverage_table(rows: list[CircuitCoverageRow]) -> str:
         "Backtracks",
     )
     out.write("\nPODEM fault coverage (collapsed fault sites)\n")
-    out.write("-" * 88 + "\n")
+    out.write("-" * 104 + "\n")
     out.write(
-        f"{headers[0]:<10} {headers[1]:>7} {headers[2]:>8} {headers[3]:>10} "
-        f"{headers[4]:>9} {headers[5]:>8} {headers[6]:>6} {headers[7]:>11}\n"
+        f"{headers[0]:<10} {headers[1]:>5} {headers[2]:>5} {headers[3]:>7} "
+        f"{headers[4]:>7} {headers[5]:>8} {headers[6]:>10} "
+        f"{headers[7]:>9} {headers[8]:>8} {headers[9]:>6} {headers[10]:>11}\n"
     )
-    out.write("-" * 88 + "\n")
+    out.write("-" * 104 + "\n")
     for row in rows:
         out.write(
-            f"{row.name:<10} {row.total_faults:>7} {row.covered:>8} "
-            f"{row.coverage_percent:>9.2f}% {row.patterns:>9} "
+            f"{row.name:<10} {row.raw_faults:>5} {row.collapsed_reps:>5} "
+            f"{row.collapse_reduction_percent:>6.2f}% {row.total_faults:>7} "
+            f"{row.covered:>8} {row.coverage_percent:>9.2f}% {row.patterns:>9} "
             f"{row.untestable:>8} {row.aborted:>6} {row.backtracks:>11}\n"
         )
-    out.write("-" * 88 + "\n")
+    out.write("-" * 104 + "\n")
     if rows:
         total_sites = sum(row.total_faults for row in rows)
         total_covered = sum(row.covered for row in rows)
@@ -99,14 +117,21 @@ def _print_coverage_table(rows: list[CircuitCoverageRow]) -> None:
 
 
 def _ntotal_gates(verilog_path: Path) -> int:
-    for line in verilog_path.read_text(encoding="utf-8").splitlines()[:12]:
+    """Return declared gate count, or count primitive instances if the header is missing."""
+    text = verilog_path.read_text(encoding="utf-8")
+    for line in text.splitlines()[:12]:
         if "NtotalGates" in line:
             return int(line.split()[-1])
-    return 10**9
+    return sum(1 for line in text.splitlines() if _GATE_LINE_RE.match(line))
 
 
 def _discover_circuits() -> list[Path]:
-    paths = list(ISCAS_DIR.glob("*.v"))
+    """ISCAS'85 netlists, easiest (fewest gates) first."""
+    paths = [
+        path
+        for path in ISCAS_DIR.glob("*.v")
+        if path.stem not in SKIP_CIRCUITS
+    ]
     return sorted(paths, key=lambda path: (_ntotal_gates(path), path.name))
 
 
@@ -123,7 +148,10 @@ def main() -> None:
     parser.add_argument(
         "--all",
         action="store_true",
-        help="Run every .v file in ISCAS85_Circuits/ and print a coverage table",
+        help=(
+            "Run every ISCAS'85 .v in ISCAS85_Circuits/ from easiest to hardest "
+            "(fewest gates first) and print a coverage table"
+        ),
     )
     args = parser.parse_args()
 
@@ -131,7 +159,7 @@ def main() -> None:
         paths = _discover_circuits()
         if not paths:
             raise SystemExit(f"no .v files under {ISCAS_DIR}")
-        print("Run order (smallest gate count first):", flush=True)
+        print("Run order (easiest first, by NtotalGates):", flush=True)
         for index, path in enumerate(paths, start=1):
             gates = _ntotal_gates(path)
             gates_label = str(gates) if gates < 10**9 else "?"
@@ -145,7 +173,9 @@ def main() -> None:
             print(
                 f"  {row.name}: {row.coverage_percent:.2f}% "
                 f"({row.covered}/{row.total_faults} faults, "
-                f"{row.patterns} patterns)"
+                f"{row.patterns} patterns), "
+                f"collapse {row.raw_faults} -> {row.collapsed_reps} "
+                f"({row.collapse_reduction_percent:.2f}% reduction)"
             )
         _print_coverage_table(rows)
         summary_path = _ROOT / "scripts" / "iscas_batch_latest.txt"
@@ -172,6 +202,10 @@ def main() -> None:
     print(
         f"Fault coverage: {row.coverage_percent:.2f}% "
         f"({row.covered}/{row.total_faults} fault sites)"
+    )
+    print(
+        f"Fault collapse: {row.raw_faults} raw -> {row.collapsed_reps} "
+        f"representatives ({row.collapse_reduction_percent:.2f}% reduction)"
     )
 
 

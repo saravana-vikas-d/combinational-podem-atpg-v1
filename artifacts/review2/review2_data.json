@@ -1,0 +1,664 @@
+{
+  "metadata": {
+    "schema": "review2_metrics_v1",
+    "timestamp_utc": "2026-10-12T15:01:54.000443+00:00",
+    "python_version": "3.12.3 (tags/v3.12.3:f6650f9, Apr  9 2024, 14:05:25) [MSC v.1938 64 bit (AMD64)]",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "git": {
+      "branch": "wip/podem-coverage_i1",
+      "commit": "86cf0b2e42f8c232fbcbd1d8b6b40b3eb00edf91"
+    },
+    "benchmarks_requested": [
+      "c17",
+      "c432",
+      "c499",
+      "c880",
+      "c1355",
+      "c1908",
+      "c2670",
+      "c3540",
+      "c5315",
+      "c6288",
+      "c7552"
+    ],
+    "benchmarks_missing_files": [],
+    "timing_repetitions": 3,
+    "collection_command": "scripts/collect_review2_metrics.py",
+    "definitions": {
+      "parse_time": "Wall time for parse_iscas_verilog(path): read file, build circuit, validate(check_unused=True), and levelize. Does not include fault generation.",
+      "collapse_pipeline_time": "Wall time for generate_raw_faults(circuit) + collapse_equivalence + collapse_dominance on a freshly parsed circuit each repetition.",
+      "internal_wires": "Signals where is_pi is False and is_po is False.",
+      "logic_depth": "Maximum gate.level after levelization (0-based levels from PIs).",
+      "representative_count": "Number of keys in the collapse map after each stage (distinct ATPG targets after collapsing).",
+      "fault_description": "Each raw list entry is one SA0 or SA1 Fault object (line/stem or branch), not a physical site count.",
+      "partition_check": "verify_collapse_partition: bookkeeping that every raw fault name appears exactly once across representatives, equivalent, and dominator sets. Not a proof of collapsing rule correctness."
+    },
+    "podem_disclaimer": "PODEM is work in progress. This report evaluates parser and fault-collapsing measurements only; it does not establish end-to-end ATPG correctness or validated fault coverage."
+  },
+  "summary": {
+    "circuits_requested": 11,
+    "parse_succeeded": 11,
+    "parse_failed": 0,
+    "partition_check_passed": 11,
+    "partition_check_failed": 0,
+    "total_gates_all_ok": 13351,
+    "median_parse_ms_across_circuits": 9.572799783200026,
+    "mean_reduction_percent_ok": 53.77410156251155
+  },
+  "circuits": [
+    {
+      "name": "c17",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c17.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 0.3077997826039791,
+        "min_ms": 0.27479976415634155,
+        "max_ms": 0.4177996888756752,
+        "samples_ms": [
+          0.4177996888756752,
+          0.3077997826039791,
+          0.27479976415634155
+        ]
+      },
+      "primary_inputs": 5,
+      "primary_outputs": 2,
+      "total_signals": 11,
+      "internal_wires": 4,
+      "total_gates": 6,
+      "gate_type_counts": {
+        "NAND": 6
+      },
+      "max_gate_fanin": 2,
+      "max_signal_fanout": 2,
+      "logic_depth": 3,
+      "raw_line_sa0": 11,
+      "raw_line_sa1": 11,
+      "raw_branch_sa0": 6,
+      "raw_branch_sa1": 6,
+      "raw_total": 34,
+      "unique_fault_names": 34,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 22,
+      "representatives_after_dominance": 16,
+      "removed_by_equivalence": 12,
+      "removed_by_dominance_additional": 6,
+      "overall_reduction_percent": 52.94117647058823,
+      "collapse_pipeline_time": {
+        "median_ms": 0.29930006712675095,
+        "min_ms": 0.274099875241518,
+        "max_ms": 0.33560022711753845,
+        "samples_ms": [
+          0.33560022711753845,
+          0.274099875241518,
+          0.29930006712675095
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c432",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c432.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 3.217000048607588,
+        "min_ms": 2.907599788159132,
+        "max_ms": 4.072600044310093,
+        "samples_ms": [
+          4.072600044310093,
+          3.217000048607588,
+          2.907599788159132
+        ]
+      },
+      "primary_inputs": 36,
+      "primary_outputs": 7,
+      "total_signals": 196,
+      "internal_wires": 153,
+      "total_gates": 160,
+      "gate_type_counts": {
+        "NOT": 40,
+        "NAND": 79,
+        "NOR": 19,
+        "AND": 4,
+        "XOR": 18
+      },
+      "max_gate_fanin": 9,
+      "max_signal_fanout": 9,
+      "logic_depth": 17,
+      "raw_line_sa0": 196,
+      "raw_line_sa1": 196,
+      "raw_branch_sa0": 236,
+      "raw_branch_sa1": 236,
+      "raw_total": 864,
+      "unique_fault_names": 864,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 524,
+      "representatives_after_dominance": 449,
+      "removed_by_equivalence": 340,
+      "removed_by_dominance_additional": 75,
+      "overall_reduction_percent": 48.032407407407405,
+      "collapse_pipeline_time": {
+        "median_ms": 6.556500215083361,
+        "min_ms": 5.293599795550108,
+        "max_ms": 7.088599726557732,
+        "samples_ms": [
+          7.088599726557732,
+          5.293599795550108,
+          6.556500215083361
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c499",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c499.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 2.620500046759844,
+        "min_ms": 2.1265996620059013,
+        "max_ms": 2.6269000954926014,
+        "samples_ms": [
+          2.620500046759844,
+          2.6269000954926014,
+          2.1265996620059013
+        ]
+      },
+      "primary_inputs": 41,
+      "primary_outputs": 32,
+      "total_signals": 243,
+      "internal_wires": 170,
+      "total_gates": 202,
+      "gate_type_counts": {
+        "XOR": 104,
+        "AND": 56,
+        "NOT": 40,
+        "OR": 2
+      },
+      "max_gate_fanin": 5,
+      "max_signal_fanout": 12,
+      "logic_depth": 11,
+      "raw_line_sa0": 243,
+      "raw_line_sa1": 243,
+      "raw_branch_sa0": 256,
+      "raw_branch_sa1": 256,
+      "raw_total": 998,
+      "unique_fault_names": 998,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 758,
+      "representatives_after_dominance": 706,
+      "removed_by_equivalence": 240,
+      "removed_by_dominance_additional": 52,
+      "overall_reduction_percent": 29.258517034068138,
+      "collapse_pipeline_time": {
+        "median_ms": 5.9806001372635365,
+        "min_ms": 5.201299674808979,
+        "max_ms": 6.112000439316034,
+        "samples_ms": [
+          6.112000439316034,
+          5.201299674808979,
+          5.9806001372635365
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c880",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c880.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 4.3171001598238945,
+        "min_ms": 3.6467001773416996,
+        "max_ms": 4.702600184828043,
+        "samples_ms": [
+          4.3171001598238945,
+          3.6467001773416996,
+          4.702600184828043
+        ]
+      },
+      "primary_inputs": 60,
+      "primary_outputs": 26,
+      "total_signals": 443,
+      "internal_wires": 357,
+      "total_gates": 383,
+      "gate_type_counts": {
+        "NAND": 87,
+        "AND": 117,
+        "OR": 29,
+        "NOT": 63,
+        "NOR": 61,
+        "BUF": 26
+      },
+      "max_gate_fanin": 4,
+      "max_signal_fanout": 8,
+      "logic_depth": 24,
+      "raw_line_sa0": 443,
+      "raw_line_sa1": 443,
+      "raw_branch_sa0": 437,
+      "raw_branch_sa1": 437,
+      "raw_total": 1760,
+      "unique_fault_names": 1760,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 942,
+      "representatives_after_dominance": 745,
+      "removed_by_equivalence": 818,
+      "removed_by_dominance_additional": 197,
+      "overall_reduction_percent": 57.67045454545455,
+      "collapse_pipeline_time": {
+        "median_ms": 16.88390038907528,
+        "min_ms": 16.103700269013643,
+        "max_ms": 17.546200193464756,
+        "samples_ms": [
+          16.103700269013643,
+          16.88390038907528,
+          17.546200193464756
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c1355",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c1355.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 6.665599998086691,
+        "min_ms": 5.67009998485446,
+        "max_ms": 9.501799941062927,
+        "samples_ms": [
+          6.665599998086691,
+          5.67009998485446,
+          9.501799941062927
+        ]
+      },
+      "primary_inputs": 41,
+      "primary_outputs": 32,
+      "total_signals": 587,
+      "internal_wires": 514,
+      "total_gates": 546,
+      "gate_type_counts": {
+        "AND": 56,
+        "NAND": 416,
+        "NOT": 40,
+        "OR": 2,
+        "BUF": 32
+      },
+      "max_gate_fanin": 5,
+      "max_signal_fanout": 12,
+      "logic_depth": 24,
+      "raw_line_sa0": 587,
+      "raw_line_sa1": 587,
+      "raw_branch_sa0": 768,
+      "raw_branch_sa1": 768,
+      "raw_total": 2710,
+      "unique_fault_names": 2710,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 1574,
+      "representatives_after_dominance": 1210,
+      "removed_by_equivalence": 1136,
+      "removed_by_dominance_additional": 364,
+      "overall_reduction_percent": 55.35055350553505,
+      "collapse_pipeline_time": {
+        "median_ms": 27.29979995638132,
+        "min_ms": 27.156000025570393,
+        "max_ms": 27.67329989001155,
+        "samples_ms": [
+          27.29979995638132,
+          27.156000025570393,
+          27.67329989001155
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c1908",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c1908.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 9.572799783200026,
+        "min_ms": 8.780399803072214,
+        "max_ms": 9.782100096344948,
+        "samples_ms": [
+          9.572799783200026,
+          9.782100096344948,
+          8.780399803072214
+        ]
+      },
+      "primary_inputs": 33,
+      "primary_outputs": 25,
+      "total_signals": 913,
+      "internal_wires": 855,
+      "total_gates": 880,
+      "gate_type_counts": {
+        "NOT": 277,
+        "NAND": 377,
+        "BUF": 162,
+        "AND": 63,
+        "NOR": 1
+      },
+      "max_gate_fanin": 8,
+      "max_signal_fanout": 16,
+      "logic_depth": 40,
+      "raw_line_sa0": 913,
+      "raw_line_sa1": 913,
+      "raw_branch_sa0": 995,
+      "raw_branch_sa1": 995,
+      "raw_total": 3816,
+      "unique_fault_names": 3816,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 1879,
+      "representatives_after_dominance": 1566,
+      "removed_by_equivalence": 1937,
+      "removed_by_dominance_additional": 313,
+      "overall_reduction_percent": 58.9622641509434,
+      "collapse_pipeline_time": {
+        "median_ms": 39.45669997483492,
+        "min_ms": 39.21389998868108,
+        "max_ms": 46.668400056660175,
+        "samples_ms": [
+          39.45669997483492,
+          46.668400056660175,
+          39.21389998868108
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c2670",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c2670.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 13.04379990324378,
+        "min_ms": 12.804499827325344,
+        "max_ms": 13.79540003836155,
+        "samples_ms": [
+          12.804499827325344,
+          13.79540003836155,
+          13.04379990324378
+        ]
+      },
+      "primary_inputs": 233,
+      "primary_outputs": 140,
+      "total_signals": 1502,
+      "internal_wires": 1129,
+      "total_gates": 1269,
+      "gate_type_counts": {
+        "BUF": 272,
+        "AND": 333,
+        "NOT": 321,
+        "NAND": 254,
+        "OR": 77,
+        "NOR": 12
+      },
+      "max_gate_fanin": 5,
+      "max_signal_fanout": 11,
+      "logic_depth": 32,
+      "raw_line_sa0": 1502,
+      "raw_line_sa1": 1502,
+      "raw_branch_sa0": 1244,
+      "raw_branch_sa1": 1244,
+      "raw_total": 5492,
+      "unique_fault_names": 5492,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 2747,
+      "representatives_after_dominance": 2317,
+      "removed_by_equivalence": 2745,
+      "removed_by_dominance_additional": 430,
+      "overall_reduction_percent": 57.811361981063364,
+      "collapse_pipeline_time": {
+        "median_ms": 96.40369983389974,
+        "min_ms": 96.40089981257915,
+        "max_ms": 107.26500023156404,
+        "samples_ms": [
+          96.40089981257915,
+          107.26500023156404,
+          96.40369983389974
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c3540",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c3540.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 17.166499979794025,
+        "min_ms": 16.350800171494484,
+        "max_ms": 17.247799783945084,
+        "samples_ms": [
+          17.166499979794025,
+          17.247799783945084,
+          16.350800171494484
+        ]
+      },
+      "primary_inputs": 50,
+      "primary_outputs": 22,
+      "total_signals": 1719,
+      "internal_wires": 1647,
+      "total_gates": 1669,
+      "gate_type_counts": {
+        "BUF": 223,
+        "NOT": 490,
+        "OR": 92,
+        "AND": 498,
+        "NAND": 298,
+        "NOR": 68
+      },
+      "max_gate_fanin": 8,
+      "max_signal_fanout": 16,
+      "logic_depth": 47,
+      "raw_line_sa0": 1719,
+      "raw_line_sa1": 1719,
+      "raw_branch_sa0": 1821,
+      "raw_branch_sa1": 1821,
+      "raw_total": 7080,
+      "unique_fault_names": 7080,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 3428,
+      "representatives_after_dominance": 2786,
+      "removed_by_equivalence": 3652,
+      "removed_by_dominance_additional": 642,
+      "overall_reduction_percent": 60.64971751412429,
+      "collapse_pipeline_time": {
+        "median_ms": 134.87339997664094,
+        "min_ms": 134.02739958837628,
+        "max_ms": 137.79509998857975,
+        "samples_ms": [
+          137.79509998857975,
+          134.02739958837628,
+          134.87339997664094
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c5315",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c5315.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 25.658799801021814,
+        "min_ms": 22.8770999237895,
+        "max_ms": 26.884600054472685,
+        "samples_ms": [
+          25.658799801021814,
+          26.884600054472685,
+          22.8770999237895
+        ]
+      },
+      "primary_inputs": 178,
+      "primary_outputs": 123,
+      "total_signals": 2485,
+      "internal_wires": 2184,
+      "total_gates": 2307,
+      "gate_type_counts": {
+        "BUF": 313,
+        "AND": 718,
+        "NOT": 581,
+        "NAND": 454,
+        "OR": 214,
+        "NOR": 27
+      },
+      "max_gate_fanin": 9,
+      "max_signal_fanout": 15,
+      "logic_depth": 49,
+      "raw_line_sa0": 2485,
+      "raw_line_sa1": 2485,
+      "raw_branch_sa0": 2830,
+      "raw_branch_sa1": 2830,
+      "raw_total": 10630,
+      "unique_fault_names": 10630,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 5350,
+      "representatives_after_dominance": 4492,
+      "removed_by_equivalence": 5280,
+      "removed_by_dominance_additional": 858,
+      "overall_reduction_percent": 57.74223894637817,
+      "collapse_pipeline_time": {
+        "median_ms": 358.6575002409518,
+        "min_ms": 347.1958003938198,
+        "max_ms": 360.1330001838505,
+        "samples_ms": [
+          347.1958003938198,
+          358.6575002409518,
+          360.1330001838505
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c6288",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c6288.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 26.033999864012003,
+        "min_ms": 25.156000163406134,
+        "max_ms": 34.59850000217557,
+        "samples_ms": [
+          25.156000163406134,
+          26.033999864012003,
+          34.59850000217557
+        ]
+      },
+      "primary_inputs": 32,
+      "primary_outputs": 32,
+      "total_signals": 2448,
+      "internal_wires": 2384,
+      "total_gates": 2416,
+      "gate_type_counts": {
+        "AND": 256,
+        "NOT": 32,
+        "NOR": 2128
+      },
+      "max_gate_fanin": 2,
+      "max_signal_fanout": 16,
+      "logic_depth": 124,
+      "raw_line_sa0": 2448,
+      "raw_line_sa1": 2448,
+      "raw_branch_sa0": 3840,
+      "raw_branch_sa1": 3840,
+      "raw_total": 12576,
+      "unique_fault_names": 12576,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 7744,
+      "representatives_after_dominance": 5824,
+      "removed_by_equivalence": 4832,
+      "removed_by_dominance_additional": 1920,
+      "overall_reduction_percent": 53.68956743002545,
+      "collapse_pipeline_time": {
+        "median_ms": 407.9320002347231,
+        "min_ms": 390.9248001873493,
+        "max_ms": 412.75479970499873,
+        "samples_ms": [
+          390.9248001873493,
+          412.75479970499873,
+          407.9320002347231
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    },
+    {
+      "name": "c7552",
+      "input_file": "E:\\Projects\\ATPG_Tool_using_Python\\combinational-podem-atpg-v1\\ISCAS85_Circuits\\c7552.v",
+      "parse_ok": true,
+      "parse_error": null,
+      "parse_time": {
+        "median_ms": 36.94339981302619,
+        "min_ms": 35.74799979105592,
+        "max_ms": 43.14680024981499,
+        "samples_ms": [
+          36.94339981302619,
+          43.14680024981499,
+          35.74799979105592
+        ]
+      },
+      "primary_inputs": 207,
+      "primary_outputs": 108,
+      "total_signals": 3720,
+      "internal_wires": 3405,
+      "total_gates": 3513,
+      "gate_type_counts": {
+        "BUF": 535,
+        "NOT": 876,
+        "AND": 776,
+        "NAND": 1028,
+        "NOR": 54,
+        "OR": 244
+      },
+      "max_gate_fanin": 5,
+      "max_signal_fanout": 15,
+      "logic_depth": 43,
+      "raw_line_sa0": 3720,
+      "raw_line_sa1": 3720,
+      "raw_branch_sa0": 3833,
+      "raw_branch_sa1": 3833,
+      "raw_total": 15106,
+      "unique_fault_names": 15106,
+      "duplicate_fault_names": 0,
+      "representatives_after_equivalence": 7550,
+      "representatives_after_dominance": 6132,
+      "removed_by_equivalence": 7556,
+      "removed_by_dominance_additional": 1418,
+      "overall_reduction_percent": 59.406858202038926,
+      "collapse_pipeline_time": {
+        "median_ms": 809.2127996496856,
+        "min_ms": 609.7764000296593,
+        "max_ms": 850.3983002156019,
+        "samples_ms": [
+          609.7764000296593,
+          809.2127996496856,
+          850.3983002156019
+        ]
+      },
+      "partition_check_passed": true,
+      "partition_check_error": null,
+      "metrics_warnings": []
+    }
+  ]
+}

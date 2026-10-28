@@ -838,12 +838,21 @@ class PodemBatchResult:
     covered: set[str]
     total_faults: int = 0
     total_backtracks: int = 0
+    raw_fault_count: int = 0
+    collapsed_representatives: int = 0
 
     @property
     def coverage_percent(self) -> float:
         if self.total_faults == 0:
             return 0.0
         return 100.0 * len(self.covered) / self.total_faults
+
+    @property
+    def collapse_reduction_percent(self) -> float:
+        if self.raw_fault_count == 0:
+            return 0.0
+        removed = self.raw_fault_count - self.collapsed_representatives
+        return 100.0 * removed / self.raw_fault_count
 
 
 def run_podem_on_collapsed(
@@ -942,14 +951,17 @@ def run_podem_on_collapsed(
     )
     # #endregion
 
+    fault_sites = count_fault_sites(collapse_map)
     return PodemBatchResult(
         patterns=patterns,
         untestable=untestable,
         aborted=aborted,
         results=results,
         covered=covered,
-        total_faults=count_fault_sites(collapse_map),
+        total_faults=fault_sites,
         total_backtracks=total_backtracks,
+        raw_fault_count=fault_sites,
+        collapsed_representatives=len(collapse_map),
     )
 
 

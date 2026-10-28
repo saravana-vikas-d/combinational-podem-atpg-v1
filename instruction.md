@@ -171,6 +171,53 @@ git push origin main
 
 ---
 
+## Review-II metrics (parser + fault collapsing only)
+
+Single data file for slides/charts (no PODEM coverage):
+
+```bash
+python scripts/collect_review2_metrics.py
+python scripts/generate_review2_report.py
+```
+
+- **Data:** `artifacts/review2/review2_data.json` (all circuits and metadata)
+- **Report:** `artifacts/review2/review2_analysis.md` (regenerate anytime from JSON)
+
+---
+
+## Run PODEM on All ISCAS'85 Circuits
+
+From the repo root. Circuits run **easiest first** (fewest gates: `c17`, `c432`, `c499`, … up to `c7552`). `ex1.v` is skipped (invalid toy netlist).
+
+```bash
+python podem_print.py --all
+```
+
+On Windows PowerShell:
+
+```powershell
+python podem_print.py --all
+```
+
+That uses `ISCAS85_Circuits/*.v` (not the Vivado LUT copies). Limits are `recursion=200` and `backtrack=10000`.
+
+**What you get**
+
+- A coverage row per circuit as each one finishes
+- Pattern files in `Pattern_prints/`
+- A table plus `scripts/iscas_batch_latest.txt`
+
+**One circuit only**
+
+```bash
+python podem_print.py ISCAS85_Circuits/c17.v
+python podem_print.py ISCAS85_Circuits/c432.v
+```
+
+Large circuits (`c2670` and up) can take a long time at these limits.
+
+---
+
 ## Bottom Line
 
 Code locally → `git add` → `git commit` → `git push`. Because `main` tracks `github/main`, GitHub stays updated with almost no extra steps.
