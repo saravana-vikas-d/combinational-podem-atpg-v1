@@ -64,7 +64,16 @@ def test_c17_podem_report_validates(tmp_path):
     assert "faulty POs" in text
 
 
-def test_parse_podem_report_entries():
+def test_redundant_branch_sa1_when_stem_is_one():
+    from atpg.fault_sim import parse_pattern, simulate_faulty_outputs
+    from fault.fault import parse_fault_name
+
+    circuit = parse_iscas_verilog(ISCAS / "c17.v")
+    levelize(circuit)
+    fault = parse_fault_name("N16__NAND2_6_0_sa1")
+    _, ok, detected = simulate_faulty_outputs(circuit, fault, parse_pattern("X0111"))
+    assert ok
+    assert not detected
     reports = sorted(PATTERN.glob("c17_podem_*.txt"))
     if not reports:
         pytest.skip("no c17 PODEM report")

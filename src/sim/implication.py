@@ -15,20 +15,47 @@ class BacktraceError(ValueError):
     """Raised when backtrace arguments are invalid."""
 
 
+def _good_rail(value: Logic5) -> int | None:
+    """Return the good-circuit 0/1 rail when known."""
+    match value:
+        case Logic5.ZERO:
+            return 0
+        case Logic5.ONE:
+            return 1
+        case Logic5.D:
+            return 1
+        case Logic5.DBAR:
+            return 0
+        case Logic5.X:
+            return None
+    raise AssertionError(f"unhandled Logic5 value: {value}")
+
+
 def activated_fault_value(stuck_at: StuckAt) -> Logic5:
-    """Return the five-valued activation for a stuck-at fault."""
+    """Return D/D' when the good rail is unknown (PODEM activation)."""
+    return Logic5.D if stuck_at == 0 else Logic5.DBAR
+
+
+def effective_fault_logic5(good_rail: int | None, stuck_at: StuckAt) -> Logic5:
+    """Map good-circuit rail + stuck-at to Logic5 (redundant faults stay 0/1)."""
+    faulty_rail = stuck_at
+    if good_rail is None:
+        return activated_fault_value(stuck_at)
+    if good_rail == faulty_rail:
+        return Logic5.ZERO if good_rail == 0 else Logic5.ONE
     return Logic5.D if stuck_at == 0 else Logic5.DBAR
 
 
 def inject_fault(circuit: Circuit, fault: Fault) -> None:
     """Activate a line/stem or branch fault.
 
-    Line/stem faults set ``signals[fault.signal_name].value`` to ``D`` or ``D'``.
-    Branch faults are applied during ``forward_imply`` via ``active_fault``.
+    Line/stem faults set the signal from the good rail and ``stuck_at`` (D/D' only
+    when they differ). Branch faults are applied during ``forward_imply``.
     """
     if fault.is_branch:
         return
-    circuit.signals[fault.signal_name].value = activated_fault_value(fault.stuck_at)
+    signal = circuit.signals[fault.signal_name]
+    signal.value = effective_fault_logic5(_good_rail(signal.value), fault.stuck_at)
 
 
 def resolve_input_value(
@@ -44,7 +71,10 @@ def resolve_input_value(
             and active_fault.gate_instance == gate.instance_name
             and active_fault.input_index == input_index
         ):
-            return activated_fault_value(active_fault.stuck_at)
+            return effective_fault_logic5(
+                _good_rail(signal.value),
+                active_fault.stuck_at,
+            )
     return signal.value
 
 
@@ -127,22 +157,6 @@ def _validate_single_input_gate(gate: Gate, input_index: int) -> None:
         raise BacktraceError(
             f"gate {gate.instance_name!r} requires input_index 0 for backtrace"
         )
-
-
-def _good_rail(value: Logic5) -> int | None:
-    """Return the good-circuit 0/1 rail when known."""
-    match value:
-        case Logic5.ZERO:
-            return 0
-        case Logic5.ONE:
-            return 1
-        case Logic5.D:
-            return 1
-        case Logic5.DBAR:
-            return 0
-        case Logic5.X:
-            return None
-    raise AssertionError(f"unhandled Logic5 value: {value}")
 
 
 def _logic5_from_rail(bit: int) -> Logic5:

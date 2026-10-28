@@ -21,6 +21,32 @@ ISCAS = Path(__file__).resolve().parents[2] / "ISCAS85_Circuits"
 PATTERN = Path(__file__).resolve().parents[2] / "Pattern_prints"
 
 
+PODEM_BATCH_CIRCUITS = (
+    "c17",
+    "c432",
+    "c499",
+    "c880",
+    "c1355",
+    "c1908",
+    "c2670",
+    "c3540",
+    "c5315",
+)
+
+
+def _circuits_ready_for_compaction() -> list[str]:
+    """PODEM batch netlists that have a report in Pattern_prints/."""
+    ready: list[str] = []
+    for name in PODEM_BATCH_CIRCUITS:
+        verilog = ISCAS / f"{name}.v"
+        if verilog.is_file() and list(PATTERN.glob(f"{name}_podem_*.txt")):
+            ready.append(name)
+    return ready
+
+
+READY_CIRCUITS = _circuits_ready_for_compaction()
+
+
 def test_greedy_set_cover_toy():
     e1 = PatternEntry(index=1, origin_rep="a", pattern=(0,))
     e2 = PatternEntry(index=2, origin_rep="b", pattern=(1,))
@@ -46,10 +72,10 @@ def test_c17_compaction_covers_all_reps(tmp_path):
         reports[-1],
         tmp_path,
     )
-    assert result.complete
     assert result.validation_ok
     assert len(result.universe_reps) == 16
     assert result.compact_count <= result.original_count
+    assert result.complete
     assert len(result.covered_reps) == 16
     assert report_path.is_file()
     assert tp_path.is_file()
@@ -83,3 +109,25 @@ def test_strict_coverage_and_validation_on_c17():
     assert ok
     assert not errors
     assert result.validation_ok
+
+
+@pytest.mark.parametrize("circuit_name", READY_CIRCUITS)
+def test_compaction_on_ready_circuits(circuit_name: str, tmp_path):
+    reports = sorted(PATTERN.glob(f"{circuit_name}_podem_*.txt"))
+    assert reports, f"no PODEM report for {circuit_name}"
+    verilog = ISCAS / f"{circuit_name}.v"
+    result, report_path, tp_path = run_compaction_from_podem_report(
+        verilog,
+        reports[-1],
+        tmp_path,
+    )
+    assert result.compact_count <= result.original_count
+    assert result.validation_ok, result.validation_errors
+    assert report_path.is_file()
+    assert tp_path.is_file()
+    text = report_path.read_text(encoding="utf-8")
+    assert "Vector validation  : PASS" in text
+    assert f"PATTERN COMPACTION REPORT: {circuit_name}" in text
+    assert len(result.covered_reps) <= len(result.universe_reps)
+    if result.complete:
+        assert len(result.covered_reps) == len(result.universe_reps)

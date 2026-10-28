@@ -113,13 +113,25 @@ def simulate_faulty_outputs(
     pattern: Pattern,
 ) -> tuple[tuple[tuple[str, Logic5], ...], bool, bool]:
     """Return PO values with fault present, imply ok, and detected at PO."""
+    from sim.implication import effective_fault_logic5, _good_rail
+
     saved = snapshot_values(circuit)
     try:
         apply_pattern(circuit, pattern)
         reset_values(circuit, keep_pis=True)
-        inject_fault(circuit, fault)
-        active = fault if fault.is_branch else None
-        ok = forward_imply(circuit, active_fault=active)
+        if not forward_imply(circuit, active_fault=None):
+            return primary_output_values(circuit), False, False
+        if fault.is_branch:
+            ok = forward_imply(circuit, active_fault=fault)
+        else:
+            pi_names = {pi.name for pi in circuit.primary_inputs}
+            signal = circuit.signals[fault.signal_name]
+            good_rail = _good_rail(signal.value)
+            for sig in circuit.signals.values():
+                if sig.name not in pi_names:
+                    sig.value = Logic5.X
+            signal.value = effective_fault_logic5(good_rail, fault.stuck_at)
+            ok = forward_imply(circuit, active_fault=None)
         detected = ok and fault_detected_at_po(circuit)
         return primary_output_values(circuit), ok, detected
     finally:
